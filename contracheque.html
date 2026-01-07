@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador Contracheque 2026 - Offline</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1e40af;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --success: #059669;
+            --danger: #dc2626;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        header {
+            background: var(--text-main);
+            color: white;
+            padding: 1rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .header-title h1 { margin: 0; font-size: 1.25rem; }
+        .header-title small { color: #94a3b8; font-size: 0.75rem; }
+
+        .btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.875rem;
+            transition: background 0.2s;
+        }
+        .btn:hover { background: var(--primary-dark); }
+        .btn-outline { background: transparent; border: 1px solid rgba(255,255,255,0.2); }
+        .btn-outline:hover { background: rgba(255,255,255,0.1); }
+
+        /* Grid Layout */
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+        @media (min-width: 768px) {
+            .grid { grid-template-columns: 4fr 6fr; }
+        }
+
+        /* Cards */
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+
+        .card-header {
+            background: #f1f5f9;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            font-weight: 600;
+            color: var(--text-main);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-body { padding: 16px; }
+
+        /* Inputs */
+        .form-group { margin-bottom: 12px; }
+        label { display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 4px; color: var(--text-main); }
+        input[type="number"], input[type="text"], select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 1rem;
+            box-sizing: border-box; 
+            outline: none;
+        }
+        input:focus { border-color: var(--primary); ring: 2px solid var(--primary); }
+
+        .row { display: flex; gap: 10px; }
+        .col { flex: 1; }
+
+        /* Results */
+        .result-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .result-box {
+            background: white;
+            border: 1px solid var(--border);
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .result-label { font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: bold; }
+        .result-value { font-size: 1.25rem; font-weight: 700; color: var(--text-main); margin-top: 4px; }
+        .text-success { color: var(--success); }
+        .text-danger { color: var(--danger); }
+        .text-primary { color: var(--primary); }
+
+        /* Table */
+        table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+        th { text-align: left; padding: 10px; background: #f8fafc; color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; }
+        td { padding: 10px; border-bottom: 1px solid var(--border); }
+        tr:last-child td { border-bottom: none; }
+        .text-right { text-align: right; }
+        .font-mono { font-family: monospace; }
+        
+        /* Toggles & Checkboxes */
+        .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            margin-bottom: 8px;
+        }
+        .quota-selector {
+            display: flex;
+            gap: 5px;
+            margin-top: 5px;
+        }
+        .quota-btn {
+            flex: 1;
+            padding: 4px;
+            font-size: 0.75rem;
+            border: 1px solid var(--border);
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .quota-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        /* Print Styles */
+        @media print {
+            body { background: white; padding: 0; }
+            header .btn { display: none; }
+            .no-print { display: none; }
+            .card { border: none; box-shadow: none; margin-bottom: 10px; }
+            .grid { display: block; }
+            .container { max-width: 100%; }
+        }
+
+        .alert-info {
+            background: #eff6ff;
+            border: 1px solid #dbeafe;
+            color: #1e40af;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            margin-top: 10px;
+            display: flex;
+            gap: 8px;
+        }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "jspdf-autotable": "https://esm.sh/jspdf-autotable@^5.0.7",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "jspdf": "https://esm.sh/jspdf@^4.0.0"
+  }
+}
+</script>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <div class="header-title">
+            <h1>Simulador Fiscal 2026</h1>
+            <small>Lei 15.270/2025 - Offline Mode</small>
+        </div>
+        <button class="btn btn-outline" onclick="window.print()">
+            🖨️ Imprimir / PDF
+        </button>
+    </header>
+
+    <div class="grid">
+        <!-- Inputs Column -->
+        <div class="no-print">
+            
+            <div class="card">
+                <div class="card-header">Dados Básicos</div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label>Subsídio Base (R$)</label>
+                        <input type="number" id="baseSalary" value="6003.39" oninput="calculate()">
+                    </div>
+                    <div class="row">
+                        <div class="col">
+                            <label>Dependentes</label>
+                            <input type="number" id="dependents" value="0" min="0" oninput="calculate()">
+                        </div>
+                        <div class="col">
+                            <label>Dedução/Dep.</label>
+                            <input type="number" id="depDeduction" value="189.59" disabled>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <span>Adicionais (ACOs)</span>
+                    <button class="btn" style="padding: 2px 8px; font-size: 0.7rem;" onclick="addACO()">+ Add</button>
+                </div>
+                <div class="card-body" id="incomesList">
+                    <!-- Dynamic Incomes Here -->
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Descontos Fixos</div>
+                <div class="card-body">
+                    
+                    <!-- Previdência -->
+                    <div class="checkbox-wrapper">
+                        <label><input type="checkbox" id="checkPrev" checked onchange="calculate()"> Previdência Oficial (14%)</label>
+                    </div>
+
+                    <!-- Associação -->
+                    <div class="checkbox-wrapper">
+                        <label><input type="checkbox" id="checkAssoc" checked onchange="calculate()"> Associação / ASPRA (2%)</label>
+                    </div>
+
+                    <!-- Fundação -->
+                    <div class="checkbox-wrapper">
+                        <label><input type="checkbox" id="checkFund" checked onchange="calculate()"> Fundação FA Saúde (0.5%)</label>
+                    </div>
+
+                    <!-- Pecúlio -->
+                    <div class="card" style="background: #eff6ff; border-color: #dbeafe; margin-bottom: 0;">
+                        <div class="card-body" style="padding: 10px;">
+                            <label style="color: #1e40af; font-size: 0.8rem;">Pecúlio Policial Militar (0,7% ref. Sd A)</label>
+                            <div class="quota-selector" id="peculioSelector">
+                                <button class="quota-btn active" onclick="setPeculio(0)">0 Cotas</button>
+                                <button class="quota-btn" onclick="setPeculio(1)">1 Cota</button>
+                                <button class="quota-btn" onclick="setPeculio(2)">2 Cotas</button>
+                                <button class="quota-btn" onclick="setPeculio(3)">3 Cotas</button>
+                            </div>
+                            <div class="text-right" style="font-size: 0.75rem; color: #1e40af; margin-top: 4px;">
+                                Total: R$ <span id="peculioValueDisplay">0,00</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Results Column -->
+        <div>
+            <div class="result-grid">
+                <div class="result-box">
+                    <div class="result-label">Salário Bruto</div>
+                    <div class="result-value" id="resGross">R$ 0,00</div>
+                </div>
+                <div class="result-box">
+                    <div class="result-label">Descontos</div>
+                    <div class="result-value text-danger" id="resDiscounts">R$ 0,00</div>
+                </div>
+                <div class="result-box">
+                    <div class="result-label">Líquido</div>
+                    <div class="result-value text-success" id="resNet">R$ 0,00</div>
+                </div>
+                <div class="result-box">
+                    <div class="result-label">IR Devido (2026)</div>
+                    <div class="result-value text-primary" id="resIR">R$ 0,00</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Detalhamento do Contracheque</div>
+                <div class="card-body" style="padding: 0;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Descrição</th>
+                                <th class="text-right">Vencimentos</th>
+                                <th class="text-right">Descontos</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <!-- Rows -->
+                        </tbody>
+                        <tfoot>
+                            <tr style="background: #f8fafc; font-weight: bold;">
+                                <td>TOTAIS</td>
+                                <td class="text-right text-success" id="tableTotalGross">R$ 0,00</td>
+                                <td class="text-right text-danger" id="tableTotalDisc">R$ 0,00</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
+            <div class="alert-info">
+                <span>ℹ️</span>
+                <div>
+                    <strong>Memória de Cálculo IR (Lei 15.270/2025)</strong><br>
+                    <span id="debugIR">Base: 0 | Imposto: 0 | Redutor: 0</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- Configuration Constants ---
+    const REF_SOLDADO_A = 6003.39;
+    
+    // Tabela IR 2026
+    const TAX_TABLE = [
+        { limit: 2428.80, rate: 0, deduction: 0 },
+        { limit: 2826.65, rate: 0.075, deduction: 182.16 },
+        { limit: 3751.05, rate: 0.15, deduction: 394.16 },
+        { limit: 4664.68, rate: 0.225, deduction: 675.49 },
+        { limit: null, rate: 0.275, deduction: 908.73 },
+    ];
+
+    // State
+    let peculioQuotas = 0;
+    let extraIncomes = [
+        // Exemplo inicial
+    ];
+
+    // --- Core Logic (The Engine) ---
+    function calculate() {
+        // 1. Get Inputs
+        const baseSalary = parseFloat(document.getElementById('baseSalary').value) || 0;
+        const dependents = parseInt(document.getElementById('dependents').value) || 0;
+        const depDeductionVal = 189.59;
+
+        // 2. Process Incomes
+        let grossTotal = baseSalary; // Base
+        let baseIR_Gross = baseSalary; // Base calculation for IR
+        let basePrev = baseSalary;
+        let baseAssoc = baseSalary;
+
+        // Process Extras
+        const processedExtras = extraIncomes.map(item => {
+            let val = 0;
+            if (item.type === 'PERCENT') {
+                val = baseSalary * (item.value / 100);
+            } else {
+                val = item.value;
+            }
+            grossTotal += val;
+            if (item.ir) baseIR_Gross += val;
+            if (item.prev) basePrev += val;
+            if (item.assoc) baseAssoc += val;
+            return { ...item, calculatedValue: val };
+        });
+
+        // 3. Process Deductions
+        let totalDiscounts = 0;
+        let itemsList = [];
+
+        // Base Item
+        itemsList.push({ name: 'Subsídio Base', type: 'income', val: baseSalary });
+        processedExtras.forEach(ex => {
+            itemsList.push({ name: ex.name, type: 'income', val: ex.calculatedValue });
+        });
+
+        // Fixed Deductions
+        let prevVal = 0;
+        if (document.getElementById('checkPrev').checked) {
+            prevVal = basePrev * 0.14;
+            itemsList.push({ name: 'Previdência Oficial (14%)', type: 'disc', val: prevVal });
+            totalDiscounts += prevVal;
+        }
+
+        let assocVal = 0;
+        if (document.getElementById('checkAssoc').checked) {
+            assocVal = baseAssoc * 0.02;
+            itemsList.push({ name: 'Associação (2%)', type: 'disc', val: assocVal });
+            totalDiscounts += assocVal;
+        }
+
+        if (document.getElementById('checkFund').checked) {
+            const fundVal = baseAssoc * 0.005;
+            itemsList.push({ name: 'Fundação FA Saúde (0.5%)', type: 'disc', val: fundVal });
+            totalDiscounts += fundVal;
+        }
+
+        // Pecúlio Logic
+        if (peculioQuotas > 0) {
+            const peculioVal = (REF_SOLDADO_A * 0.007) * peculioQuotas;
+            itemsList.push({ name: `Pecúlio PM (${peculioQuotas} cotas)`, type: 'disc', val: peculioVal });
+            totalDiscounts += peculioVal;
+        }
+
+        // 4. IR Calculation (Lei 15.270/2025)
+        const totalDepDed = dependents * depDeductionVal;
+        const netBaseIR = Math.max(0, baseIR_Gross - prevVal - totalDepDed);
+
+        // Tabela Progressiva
+        let irPreliminar = 0;
+        const bracket = TAX_TABLE.find(t => t.limit === null || netBaseIR <= t.limit);
+        if (bracket) {
+            irPreliminar = (netBaseIR * bracket.rate) - bracket.deduction;
+        }
+        irPreliminar = Math.max(0, irPreliminar);
+
+        // Redutor 2026
+        let redutor = 0;
+        if (baseIR_Gross <= 5000.00) {
+            redutor = 312.89;
+        } else if (baseIR_Gross <= 7350.00) {
+            redutor = 978.62 - (0.133145 * baseIR_Gross);
+            redutor = Math.max(0, redutor);
+        } else {
+            redutor = 0;
+        }
+
+        const irFinal = Math.max(0, irPreliminar - redutor);
+        const appliedRedutor = Math.min(redutor, irPreliminar); // Visual purpose only
+
+        if (irFinal > 0) {
+            itemsList.push({ name: 'Imposto de Renda (2026)', type: 'disc', val: irFinal });
+            totalDiscounts += irFinal;
+        }
+
+        const netTotal = grossTotal - totalDiscounts;
+
+        // 5. Update UI
+        updateDOM(grossTotal, totalDiscounts, netTotal, irFinal, itemsList, {
+            base: netBaseIR,
+            prelim: irPreliminar,
+            redutor: appliedRedutor
+        });
+    }
+
+    function updateDOM(gross, disc, net, ir, items, debug) {
+        const fmt = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+        document.getElementById('resGross').innerText = fmt(gross);
+        document.getElementById('resDiscounts').innerText = fmt(disc);
+        document.getElementById('resNet').innerText = fmt(net);
+        document.getElementById('resIR').innerText = fmt(ir);
+
+        // Update Table
+        const tbody = document.getElementById('tableBody');
+        tbody.innerHTML = '';
+        items.forEach(item => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${item.name}</td>
+                <td class="text-right font-mono text-success">${item.type === 'income' ? fmt(item.val) : '-'}</td>
+                <td class="text-right font-mono text-danger">${item.type === 'disc' ? fmt(item.val) : '-'}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        document.getElementById('tableTotalGross').innerText = fmt(gross);
+        document.getElementById('tableTotalDisc').innerText = fmt(disc);
+
+        // Debug info
+        document.getElementById('debugIR').innerHTML = `
+            Base Liq: ${fmt(debug.base)} <br> 
+            Imposto Tabela: ${fmt(debug.prelim)} <br>
+            <span style="color:green">Redutor Aplicado: -${fmt(debug.redutor)}</span>
+        `;
+    }
+
+    // --- UI Helpers ---
+    function setPeculio(n) {
+        peculioQuotas = n;
+        // Update buttons style
+        document.querySelectorAll('#peculioSelector .quota-btn').forEach((btn, idx) => {
+            if (idx === n) btn.classList.add('active');
+            else btn.classList.remove('active');
+        });
+        
+        const val = (REF_SOLDADO_A * 0.007) * n;
+        document.getElementById('peculioValueDisplay').innerText = val.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+        
+        calculate();
+    }
+
+    function addACO() {
+        const name = prompt("Nome do Adicional (ex: ACO 6h):", "ACO 6h");
+        if (!name) return;
+        
+        // Simples assumption for demo: 4.5% if name contains 6h, else 9% if 12h, else manual
+        let val = 4.5;
+        if(name.includes('12')) val = 9;
+        
+        extraIncomes.push({
+            id: Math.random(),
+            name: name,
+            type: 'PERCENT',
+            value: val,
+            ir: true, prev: false, assoc: false
+        });
+        renderIncomesInput();
+        calculate();
+    }
+
+    function removeACO(id) {
+        extraIncomes = extraIncomes.filter(i => i.id !== id);
+        renderIncomesInput();
+        calculate();
+    }
+
+    function renderIncomesInput() {
+        const container = document.getElementById('incomesList');
+        container.innerHTML = '';
+        extraIncomes.forEach(inc => {
+            const div = document.createElement('div');
+            div.className = 'checkbox-wrapper';
+            div.style.justifyContent = 'space-between';
+            div.innerHTML = `
+                <span style="font-size:0.85rem">${inc.name} (${inc.value}%)</span>
+                <button class="btn" style="background:none; color:red; padding:2px;" onclick="removeACO(${inc.id})">🗑️</button>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    // Initialize
+    calculate();
+
+</script>
+
+</body>
+</html>

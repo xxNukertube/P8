@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>P8 – Seção do Pracinha</title>
+    <meta name="description" content="Hub de ferramentas e informações da Seção do Pracinha.">
+    
+    <style>
+        /* =========================================
+           RESET E VARIÁVEIS BÁSICAS
+           ========================================= */
+        :root {
+            --primary-color: #2c3e50; /* Azul escuro sóbrio */
+            --accent-color: #3498db;  /* Azul destaque */
+            --bg-color: #f4f6f8;      /* Cinza muito claro */
+            --card-bg: #ffffff;       /* Branco */
+            --text-main: #333333;     /* Texto escuro */
+            --text-sec: #666666;      /* Texto secundário */
+            --shadow: 0 4px 6px rgba(0,0,0,0.1);
+            --radius: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            line-height: 1.6;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* =========================================
+           ESTRUTURA GERAL
+           ========================================= */
+        .container {
+            width: 100%;
+            max-width: 600px; /* Limite de largura para facilitar leitura */
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+
+        /* Header */
+        header {
+            background-color: var(--primary-color);
+            color: #fff;
+            padding: 2rem 0;
+            text-align: center;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow);
+        }
+
+        header h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+
+        /* Main Content */
+        main {
+            flex: 1; /* Empurra o footer para baixo */
+        }
+
+        /* Lista de Links (Cards) */
+        .hub-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        /* Estilo do Cartão/Link */
+        .hub-item {
+            background-color: var(--card-bg);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            border-left: 5px solid var(--accent-color);
+        }
+
+        .hub-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        }
+
+        /* Link que cobre todo o cartão */
+        .hub-link {
+            display: block;
+            padding: 1.5rem;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .hub-title {
+            display: block;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+        }
+
+        .hub-desc {
+            display: block;
+            font-size: 0.95rem;
+            color: var(--text-sec);
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 2rem 0;
+            margin-top: 3rem;
+            color: var(--text-sec);
+            font-size: 0.85rem;
+            border-top: 1px solid #e1e1e1;
+        }
+
+        /* Responsividade (Ajustes finos para telas muito pequenas) */
+        @media (max-width: 380px) {
+            header h1 { font-size: 1.5rem; }
+            .hub-link { padding: 1rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="container">
+            <h1>P8 – Seção do Pracinha</h1>
+        </div>
+    </header>
+
+    <main class="container">
+        
+        <nav aria-label="Menu Principal">
+            <ul class="hub-list">
+
+                <li class="hub-item">
+                    <a href="contracheque.html" class="hub-link">
+                        <span class="hub-title">Simulador de Contracheque</span>
+                        <span class="hub-desc">Ferramenta para estimativa de vencimentos e descontos baseada na legislação vigente.</span>
+                    </a>
+                </li>
+
+                <li class="hub-item">
+                    <a href="viagem.html" class="hub-link">
+                        <span class="hub-title">Checklist de Viagem (Plantão)</span>
+                        <span class="hub-desc">Lista de verificação de equipamentos e itens essenciais para o serviço operacional.</span>
+                    </a>
+                </li>
+
+                <li class="hub-item">
+                    <a href="escalas.html" class="hub-link">
+                        <span class="hub-title">Calendário de Plantões</span>
+                        <span class="hub-desc">Visualização das escalas de serviço e datas importantes.</span>
+                    </a>
+                </li>
+
+                <li class="hub-item">
+                    <a href="btc.html" class="hub-link">
+                        <span class="hub-title">Wallet BTC Generator</span>
+                        <span class="hub-desc">Gerador de Carteiras de Bitcoin (Em fase de testes)</span>
+                    </a>
+                </li>
+
+                </ul>
+        </nav>
+
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2026 Seção do Pracinha. Todos os direitos reservados.</p>
+        </div>
+    </footer>
+
+</body>
+</html>
