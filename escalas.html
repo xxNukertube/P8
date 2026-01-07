@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Plantão Pro</title>
+    
+    <!-- React e ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel para JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Configuração do Tailwind para Dark Mode -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            850: '#1e293b',
+                            900: '#0f172a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Estilos Globais e Utilitários */
+        body { -webkit-tap-highlight-color: transparent; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; }
+        .input-field { width: 100%; padding: 0.75rem; border-radius: 0.75rem; border: 1px solid #e2e8f0; outline: none; transition: all; }
+        .dark .input-field { background-color: #334155; border-color: #475569; color: white; }
+        .input-field:focus { border-color: #3b82f6; ring: 2px; ring-color: #93c5fd; }
+        .label-text { display: block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 0.25rem; text-transform: uppercase; }
+        .dark .label-text { color: #94a3b8; }
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // --- Ícones (Inline SVG Components) ---
+        const IconBase = ({ children, size = 24, className = "", ...props }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>{children}</svg>
+        );
+        const CalendarIcon = (props) => <IconBase {...props}><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></IconBase>;
+        const DollarSign = (props) => <IconBase {...props}><line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></IconBase>;
+        const Settings = (props) => <IconBase {...props}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.39a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></IconBase>;
+        const ChevronLeft = (props) => <IconBase {...props}><path d="m15 18-6-6 6-6"/></IconBase>;
+        const ChevronRight = (props) => <IconBase {...props}><path d="m9 18 6-6-6-6"/></IconBase>;
+        const Trash2 = (props) => <IconBase {...props}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></IconBase>;
+        const Clock = (props) => <IconBase {...props}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></IconBase>;
+        const Moon = (props) => <IconBase {...props}><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></IconBase>;
+        const Sun = (props) => <IconBase {...props}><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></IconBase>;
+        const Briefcase = (props) => <IconBase {...props}><rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></IconBase>;
+        const X = (props) => <IconBase {...props}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></IconBase>;
+        const Check = (props) => <IconBase {...props}><path d="M20 6 9 17l-5-5"/></IconBase>;
+        const Wand2 = (props) => <IconBase {...props}><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></IconBase>;
+        const CalendarDays = (props) => <IconBase {...props}><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></IconBase>;
+        const Save = (props) => <IconBase {...props}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></IconBase>;
+        const Eraser = (props) => <IconBase {...props}><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></IconBase>;
+        const Edit2 = (props) => <IconBase {...props}><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></IconBase>;
+        const Plus = (props) => <IconBase {...props}><path d="M5 12h14"/><path d="M12 5v14"/></IconBase>;
+        const User = (props) => <IconBase {...props}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></IconBase>;
+        const Home = (props) => <IconBase {...props}><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></IconBase>;
+
+        // --- Utilitários de Data ---
+        const daysOfWeek = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+        const monthNames = [
+            'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+            'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+        ];
+
+        const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
+        const getFirstDayOfMonth = (year, month) => new Date(year, month, 1).getDay();
+
+        const parseLocalDate = (dateStr) => {
+            if (!dateStr) return null;
+            const [y, m, d] = dateStr.split('-').map(Number);
+            return new Date(y, m - 1, d, 12, 0, 0);
+        };
+
+        const formatCurrency = (value) => {
+            return new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+            }).format(value);
+        };
+
+        // --- CÁLCULO DE IR (LEI 15.270/2025) ---
+        const calculateIR = (grossIncome, dependents) => {
+            // Contribuição Previdenciária (SPS - 14% para Militares Estaduais)
+            const previdencia = grossIncome * 0.14;
+            
+            // Dedução por dependente (2026: 189,59)
+            const deductionDeps = dependents * 189.59;
+            
+            // Base de Cálculo
+            const base = grossIncome - previdencia - deductionDeps;
+            
+            if (base <= 0) return 0;
+
+            // Tabela Progressiva Mensal (2026)
+            let irPreliminar = 0;
+            if (base <= 2428.80) {
+                irPreliminar = 0;
+            } else if (base <= 2826.65) {
+                irPreliminar = (base * 0.075) - 182.16;
+            } else if (base <= 3751.05) {
+                irPreliminar = (base * 0.15) - 394.16;
+            } else if (base <= 4664.68) {
+                irPreliminar = (base * 0.225) - 675.49;
+            } else {
+                irPreliminar = (base * 0.275) - 908.73;
+            }
+
+            // Novo Redutor de 2026
+            let redutor = 0;
+            if (grossIncome <= 5000) {
+                redutor = 312.89;
+            } else if (grossIncome <= 7350) {
+                redutor = 978.62 - (0.133145 * grossIncome);
+            } else {
+                redutor = 0;
+            }
+
+            const irFinal = irPreliminar - redutor;
+            return Math.max(0, irFinal); // Imposto não pode ser negativo
+        };
+
+        // --- Componente Modal ---
+        const Modal = ({ isOpen, onClose, title, children }) => {
+            if (!isOpen) return null;
+            return (
+                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm transition-all">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+                        <div className="p-4 border-b dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900 shrink-0">
+                            <h3 className="font-bold text-lg text-slate-800 dark:text-white">{title}</h3>
+                            <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 transition-colors">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="p-4 overflow-y-auto custom-scrollbar">
+                            {children}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- APP PRINCIPAL ---
+        function App() {
+            // --- Estados Globais ---
+            const [currentDate, setCurrentDate] = useState(new Date());
+            const [activeTab, setActiveTab] = useState('calendar'); 
+            const [isDarkMode, setIsDarkMode] = useState(false);
+            
+            // --- Dados Principais ---
+            const [shifts, setShifts] = useState([]);
+            const [shiftTypes, setShiftTypes] = useState([
+                { id: '1', name: 'ACO (06h)', color: 'bg-emerald-500', value: 270.15, duration: 6 },
+                { id: '2', name: 'ACO (12h)', color: 'bg-blue-600', value: 540.31, duration: 12 },
+                { id: '3', name: 'ACO (24h)', color: 'bg-purple-600', value: 1080.62, duration: 24 },
+                { id: '4', name: 'Plantão Ordinário PMTO', color: 'bg-slate-500', value: 0.00, duration: 24 },
+            ]);
+            const [savedScales, setSavedScales] = useState([]);
+            
+            // --- Dados Funcionais (Novos) ---
+            const [functionalData, setFunctionalData] = useState({
+                rank: 'SOLDADO LETRA A',
+                salary: 6003.39,
+                dependents: 0,
+                location: '8ª CIPM'
+            });
+
+            // --- Estados de Modais ---
+            const [selectedDay, setSelectedDay] = useState(null);
+            const [isShiftModalOpen, setIsShiftModalOpen] = useState(false);
+            const [isTypeModalOpen, setIsTypeModalOpen] = useState(false);
+            const [isScaleModalOpen, setIsScaleModalOpen] = useState(false);
+            const [editingType, setEditingType] = useState(null);
+
+            // --- Estados do Gerador de Escala ---
+            const [scaleMode, setScaleMode] = useState('generate');
+            const [scaleStartDate, setScaleStartDate] = useState(new Date().toISOString().split('T')[0]);
+            const [scaleEndDate, setScaleEndDate] = useState('');
+            const [scalePattern, setScalePattern] = useState([]); 
+            const [scaleName, setScaleName] = useState(''); 
+            const [deleteTypeFilter, setDeleteTypeFilter] = useState('all');
+            const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+            // --- Inicialização e Persistência ---
+            useEffect(() => {
+                const savedData = localStorage.getItem('plantaoProData');
+                if (savedData) {
+                    try {
+                        const parsed = JSON.parse(savedData);
+                        setShifts(parsed.shifts || []);
+                        if (parsed.shiftTypes && parsed.shiftTypes.length > 0) setShiftTypes(parsed.shiftTypes);
+                        if (parsed.savedScales) setSavedScales(parsed.savedScales);
+                        if (parsed.isDarkMode) setIsDarkMode(parsed.isDarkMode);
+                        if (parsed.functionalData) setFunctionalData(parsed.functionalData); // Carregar dados funcionais
+                    } catch (e) { console.error("Erro ao carregar dados", e); }
+                }
+            }, []);
+
+            useEffect(() => {
+                localStorage.setItem('plantaoProData', JSON.stringify({ 
+                    shifts, 
+                    shiftTypes, 
+                    savedScales, 
+                    isDarkMode,
+                    functionalData 
+                }));
+                if (isDarkMode) {
+                    document.documentElement.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                }
+            }, [shifts, shiftTypes, savedScales, isDarkMode, functionalData]);
+
+            // --- Helpers ---
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const daysInMonth = getDaysInMonth(year, month);
+            const firstDay = getFirstDayOfMonth(year, month);
+
+            const prevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
+            const nextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
+            const goToToday = () => setCurrentDate(new Date());
+
+            const getShiftsForDay = (day) => {
+                const dateStr = new Date(year, month, day).toISOString().split('T')[0];
+                return shifts.filter(s => s.date === dateStr);
+            };
+
+            // --- Actions ---
+            const handleDayClick = (day) => {
+                setSelectedDay(new Date(year, month, day));
+                setIsShiftModalOpen(true);
+            };
+
+            const addShift = (type, dateObj = selectedDay) => {
+                const dateStr = dateObj.toISOString().split('T')[0];
+                if (shifts.some(s => s.date === dateStr && s.typeId === type.id)) return;
+
+                const newShift = {
+                    id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+                    date: dateStr,
+                    typeId: type.id,
+                    value: type.value,
+                    note: ''
+                };
+                setShifts(prev => [...prev, newShift]);
+                setIsShiftModalOpen(false);
+            };
+
+            const removeShift = (id) => {
+                setShifts(shifts.filter(s => s.id !== id));
+            };
+
+            const updateShiftValue = (id, newValue) => {
+                setShifts(shifts.map(s => s.id === id ? { ...s, value: parseFloat(newValue) || 0 } : s));
+            };
+
+            const handleFunctionalChange = (e) => {
+                const { name, value } = e.target;
+                setFunctionalData(prev => ({
+                    ...prev,
+                    [name]: name === 'salary' || name === 'dependents' ? parseFloat(value) || 0 : value
+                }));
+            };
+
+            // --- Gerador de Escalas ---
+            const shiftsToDeletePreview = useMemo(() => {
+                if (scaleMode !== 'delete' || !scaleStartDate || !scaleEndDate) return [];
+                const start = parseLocalDate(scaleStartDate);
+                const end = parseLocalDate(scaleEndDate);
+                if (!start || !end || end < start) return [];
+                start.setHours(0,0,0,0);
+                end.setHours(23,59,59,999);
+                return shifts.filter(s => {
+                    const [y, m, d] = s.date.split('-').map(Number);
+                    const dCheck = new Date(y, m - 1, d, 12, 0, 0);
+                    const isInRange = dCheck >= start && dCheck <= end;
+                    if (!isInRange) return false;
+                    if (deleteTypeFilter === 'all') return true;
+                    return s.typeId === deleteTypeFilter;
+                }).sort((a, b) => a.date.localeCompare(b.date));
+            }, [shifts, scaleMode, scaleStartDate, scaleEndDate, deleteTypeFilter]);
+
+            const generateScaleShifts = () => {
+                if (!scaleEndDate || scalePattern.length === 0) return alert("Defina data final e padrão.");
+                const start = parseLocalDate(scaleStartDate);
+                const end = parseLocalDate(scaleEndDate);
+                if (end < start) return alert("Data final deve ser posterior.");
+                
+                let newShifts = [...shifts];
+                let current = new Date(start);
+                let patternIndex = 0;
+                let safetyCounter = 0;
+
+                while (current <= end && safetyCounter < 2000) {
+                    const step = scalePattern[patternIndex % scalePattern.length];
+                    if (step.type === 'shift' && step.shiftTypeId) {
+                        const type = shiftTypes.find(t => t.id === step.shiftTypeId);
+                        if (type) {
+                            const dateStr = current.toISOString().split('T')[0];
+                            const exists = newShifts.some(s => s.date === dateStr && s.typeId === type.id);
+                            if (!exists) {
+                                newShifts.push({
+                                    id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+                                    date: dateStr,
+                                    typeId: type.id,
+                                    value: type.value,
+                                    note: scaleName || 'Gerado'
+                                });
+                            }
+                        }
+                    }
+                    current.setDate(current.getDate() + 1);
+                    patternIndex++;
+                    safetyCounter++;
+                }
+                setShifts(newShifts);
+                setIsScaleModalOpen(false);
+                setScaleName('');
+                alert("Escala gerada!");
+            };
+
+            const deleteShiftsInInterval = () => {
+                if (shiftsToDeletePreview.length === 0) return alert("Nada para remover.");
+                if (!confirm(`Remover ${shiftsToDeletePreview.length} plantões?`)) return;
+                const idsToDelete = new Set(shiftsToDeletePreview.map(s => s.id));
+                setShifts(shifts.filter(s => !idsToDelete.has(s.id)));
+                setIsScaleModalOpen(false);
+                alert("Removido.");
+            };
+
+            // --- Stats & IR Calculation ---
+            const stats = useMemo(() => {
+                const currentMonthShifts = shifts.filter(s => {
+                    const [y, m] = s.date.split('-').map(Number);
+                    return (m - 1) === month && y === year;
+                });
+
+                const totalExtras = currentMonthShifts.reduce((acc, curr) => acc + (parseFloat(curr.value) || 0), 0);
+                
+                // Cálculo do Líquido dos Extras
+                const baseSalary = functionalData.salary;
+                const dependents = functionalData.dependents;
+
+                // 1. IR sobre o Salário Base (sem extras)
+                const irBase = calculateIR(baseSalary, dependents);
+                
+                // 2. IR sobre o Total (Salário + Extras)
+                const totalGross = baseSalary + totalExtras;
+                const irTotal = calculateIR(totalGross, dependents);
+                
+                // 3. IR devido apenas aos extras (diferença)
+                const taxOnExtras = irTotal - irBase;
+                
+                // 4. Valor Líquido dos Extras
+                const netExtras = Math.max(0, totalExtras - taxOnExtras);
+
+                const byType = {};
+                currentMonthShifts.forEach(s => {
+                    const type = shiftTypes.find(t => t.id === s.typeId);
+                    const name = type ? type.name : 'Desconhecido';
+                    byType[name] = (byType[name] || 0) + 1;
+                });
+
+                return { 
+                    totalValue: totalExtras, 
+                    netValue: netExtras,
+                    totalCount: currentMonthShifts.length, 
+                    byType 
+                };
+            }, [shifts, month, year, shiftTypes, functionalData]);
+
+            // --- Render ---
+            return (
+                <div className={`h-screen flex flex-col bg-slate-50 dark:bg-slate-900 transition-colors duration-300 text-slate-800 dark:text-slate-100 font-sans`}>
+                    
+                    {/* Header */}
+                    <header className="bg-white dark:bg-slate-800 shadow-sm px-4 py-3 flex justify-between items-center z-10 shrink-0">
+                        <div className="flex items-center gap-2">
+                            <div className="bg-blue-600 p-2 rounded-lg shadow-blue-500/20 shadow-lg">
+                                <CalendarIcon className="text-white w-5 h-5" />
+                            </div>
+                            <div className="flex flex-col">
+                                <h1 className="font-bold text-xl tracking-tight leading-none">Plantão<span className="text-blue-600">Pro</span></h1>
+                                <a href="index.html" className="text-[10px] font-bold text-slate-400 hover:text-blue-500 flex items-center gap-1 mt-0.5"><Home size={10} /> Início</a>
+                            </div>
+                        </div>
+                        <div className="flex gap-2">
+                            <button onClick={() => setIsScaleModalOpen(true)} className="p-2 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors" title="Gerador de Escala">
+                                <Wand2 size={20} />
+                            </button>
+                            <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors">
+                                {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+                            </button>
+                        </div>
+                    </header>
+
+                    {/* Nav Mês (Calendar View Only) */}
+                    {activeTab === 'calendar' && (
+                        <div className="bg-white dark:bg-slate-800 border-b dark:border-slate-700 py-3 px-4 flex justify-between items-center shrink-0">
+                            <button onClick={prevMonth} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full text-slate-500 dark:text-slate-400">
+                                <ChevronLeft />
+                            </button>
+                            <div className="text-center">
+                                <h2 className="font-bold text-lg capitalize leading-none">
+                                    {monthNames[month]} <span className="text-slate-400 font-normal">{year}</span>
+                                </h2>
+                                <div className="flex flex-col items-center">
+                                    <p className="text-xs text-emerald-600 dark:text-emerald-400 font-bold mt-1">
+                                        {formatCurrency(stats.totalValue)}
+                                    </p>
+                                    <p className="text-[10px] text-slate-400 font-medium">
+                                        (Líquido: {formatCurrency(stats.netValue)})
+                                    </p>
+                                </div>
+                            </div>
+                            <button onClick={nextMonth} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full text-slate-500 dark:text-slate-400">
+                                <ChevronRight />
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Conteúdo */}
+                    <main className="flex-1 overflow-y-auto p-4 w-full max-w-lg mx-auto pb-safe">
+                        
+                        {/* CALENDAR VIEW */}
+                        {activeTab === 'calendar' && (
+                            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm p-3 animate-in fade-in duration-300">
+                                <div className="grid grid-cols-7 mb-2 border-b dark:border-slate-700 pb-2">
+                                    {daysOfWeek.map(day => (
+                                        <div key={day} className="text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">{day}</div>
+                                    ))}
+                                </div>
+                                <div className="grid grid-cols-7 gap-1">
+                                    {Array.from({ length: firstDay }).map((_, i) => <div key={`empty-${i}`} className="aspect-[4/5]" />)}
+                                    {Array.from({ length: daysInMonth }).map((_, i) => {
+                                        const day = i + 1;
+                                        const dayShifts = getShiftsForDay(day);
+                                        const isToday = new Date().getDate() === day && new Date().getMonth() === month && new Date().getFullYear() === year;
+
+                                        return (
+                                            <button key={day} onClick={() => handleDayClick(day)} className={`aspect-[4/5] rounded-xl border relative flex flex-col items-center justify-start pt-1 transition-all active:scale-95 ${isToday ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700 shadow-inner' : 'bg-white dark:bg-slate-700/50 border-transparent hover:border-slate-200 dark:hover:border-slate-600'}`}>
+                                                <span className={`text-sm font-bold ${isToday ? 'text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'}`}>{day}</span>
+                                                <div className="flex flex-col gap-0.5 mt-1 w-full px-1 items-center">
+                                                    {dayShifts.slice(0, 3).map((shift, idx) => {
+                                                        const type = shiftTypes.find(t => t.id === shift.typeId);
+                                                        return <div key={idx} className={`w-full h-1.5 rounded-full ${type?.color || 'bg-gray-400'}`} />;
+                                                    })}
+                                                    {dayShifts.length > 3 && <div className="w-1 h-1 bg-slate-400 rounded-full" />}
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                <div className="mt-4 flex justify-center">
+                                    <button onClick={goToToday} className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline">Voltar para Hoje</button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* STATS VIEW */}
+                        {activeTab === 'stats' && (
+                            <div className="space-y-4 animate-in slide-in-from-right duration-300">
+                                <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+                                    <div className="relative z-10">
+                                        <h2 className="text-blue-100 text-xs font-bold uppercase tracking-wider mb-1">Previsão ({monthNames[month]})</h2>
+                                        <div className="text-4xl font-extrabold mb-1 tracking-tight">{formatCurrency(stats.totalValue)}</div>
+                                        <div className="text-sm font-medium text-blue-200 mb-2">
+                                            (Líquido estimado: {formatCurrency(stats.netValue)})
+                                        </div>
+                                        <div className="flex gap-4 text-sm text-blue-100/90 font-medium"><span>{stats.totalCount} Plantões realizados</span></div>
+                                    </div>
+                                    <div className="absolute right-0 bottom-0 opacity-10 transform translate-x-1/4 translate-y-1/4"><DollarSign size={150} /></div>
+                                </div>
+                                <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm p-5 border border-slate-100 dark:border-slate-700">
+                                    <h3 className="font-bold text-slate-800 dark:text-white mb-4 text-lg">Resumo por Tipo</h3>
+                                    {Object.keys(stats.byType).length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center py-8 text-slate-400"><Clock size={32} className="mb-2 opacity-50" /><p>Nenhum registro.</p></div>
+                                    ) : (
+                                        <ul className="space-y-3">
+                                            {Object.entries(stats.byType).map(([name, count]) => (
+                                                <li key={name} className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-700/30 rounded-xl">
+                                                    <span className="text-slate-700 dark:text-slate-200 font-medium">{name}</span>
+                                                    <span className="bg-white dark:bg-slate-600 px-3 py-1 rounded-full text-xs font-bold text-slate-600 dark:text-slate-200 shadow-sm border dark:border-slate-500">{count}x</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* FUNCTIONAL VIEW (NOVA ABA) */}
+                        {activeTab === 'functional' && (
+                            <div className="space-y-4 animate-in slide-in-from-right duration-300">
+                                <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm p-5">
+                                    <div className="flex justify-between items-center mb-6">
+                                        <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                            <User size={18} /> Dados Funcionais
+                                        </h3>
+                                    </div>
+                                    
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="label-text">Posto / Graduação</label>
+                                            <input 
+                                                name="rank" 
+                                                value={functionalData.rank} 
+                                                onChange={handleFunctionalChange} 
+                                                className="input-field" 
+                                                placeholder="Ex: SOLDADO LETRA A"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="label-text">Remuneração (R$)</label>
+                                            <input 
+                                                name="salary" 
+                                                type="number" 
+                                                step="0.01" 
+                                                value={functionalData.salary} 
+                                                onChange={handleFunctionalChange} 
+                                                className="input-field font-mono" 
+                                                placeholder="0.00"
+                                            />
+                                            <p className="text-[10px] text-slate-400 mt-1">Usado como base para cálculo do IR (Lei 15.270/2025).</p>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="label-text">Dependentes</label>
+                                                <input 
+                                                    name="dependents" 
+                                                    type="number" 
+                                                    value={functionalData.dependents} 
+                                                    onChange={handleFunctionalChange} 
+                                                    className="input-field"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="label-text">Lotação</label>
+                                                <input 
+                                                    name="location" 
+                                                    value={functionalData.location} 
+                                                    onChange={handleFunctionalChange} 
+                                                    className="input-field" 
+                                                    placeholder="Ex: 8ª CIPM"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-900/30">
+                                    <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed text-justify">
+                                        <strong>Nota:</strong> O cálculo do valor líquido dos extras considera a nova metodologia de IR de 2026, aplicando o desconto de contribuição previdenciária do IGEPREV (14%) sobre a remuneração informada para compor a base de cálculo.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* SETTINGS VIEW */}
+                        {activeTab === 'settings' && (
+                            <div className="space-y-4 animate-in slide-in-from-right duration-300">
+                                <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm p-5">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2"><Briefcase size={18} /> Tipos de Plantão</h3>
+                                        <button onClick={() => { setEditingType(null); setIsTypeModalOpen(true); }} className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 p-2 rounded-lg text-xs font-bold transition-colors flex items-center gap-1"><Plus size={14} /> Novo</button>
+                                    </div>
+                                    <div className="space-y-3">
+                                        {shiftTypes.map(type => (
+                                            <div key={type.id} className="flex items-center justify-between p-3 border dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-10 h-10 rounded-lg ${type.color} flex items-center justify-center text-white shadow-sm ring-2 ring-white dark:ring-slate-800`}><Clock size={18} /></div>
+                                                    <div>
+                                                        <p className="font-bold text-slate-800 dark:text-white text-sm">{type.name}</p>
+                                                        <p className="text-xs text-slate-500">{formatCurrency(type.value)} • {type.duration}h</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex gap-1">
+                                                    <button onClick={() => { setEditingType(type); setIsTypeModalOpen(true); }} className="text-slate-400 hover:text-blue-500 p-2"><Edit2 size={16} /></button>
+                                                    <button onClick={() => { if(confirm('Excluir este tipo?')) setShiftTypes(shiftTypes.filter(t => t.id !== type.id)); }} className="text-slate-400 hover:text-red-500 p-2"><Trash2 size={16} /></button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                <button onClick={() => setIsScaleModalOpen(true)} className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white p-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 font-bold hover:shadow-xl hover:scale-[1.02] transition-all">
+                                    <Wand2 size={20} /> Gerenciar Escalas
+                                </button>
+                                <div className="text-center pt-8 opacity-50"><p className="text-xs">PlantãoPro v1.2 (IR 2026)</p></div>
+                            </div>
+                        )}
+                    </main>
+
+                    {/* Footer Nav */}
+                    <nav className="bg-white dark:bg-slate-800 border-t dark:border-slate-700 pb-safe pt-2 px-2 shadow-[0_-5px_10px_rgba(0,0,0,0.03)] z-20 shrink-0">
+                        <div className="flex justify-around items-center pb-2">
+                            {[
+                                { id: 'calendar', icon: CalendarIcon, label: 'Escala' },
+                                { id: 'stats', icon: DollarSign, label: 'Ganhos' },
+                                { id: 'functional', icon: User, label: 'Funcional' },
+                                { id: 'settings', icon: Settings, label: 'Ajustes' },
+                            ].map(tab => (
+                                <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex flex-col items-center p-2 rounded-xl transition-all duration-300 w-16 ${activeTab === tab.id ? 'text-blue-600 dark:text-blue-400 -translate-y-1' : 'text-slate-400 hover:text-slate-600'}`}>
+                                    <tab.icon size={24} strokeWidth={activeTab === tab.id ? 2.5 : 2} />
+                                    <span className="text-[10px] font-bold mt-1">{tab.label}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </nav>
+
+                    {/* MODAIS */}
+                    <Modal isOpen={isShiftModalOpen} onClose={() => setIsShiftModalOpen(false)} title={selectedDay?.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}>
+                        <div className="space-y-6">
+                            <div className="space-y-2">
+                                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Adicionar Plantão</h4>
+                                <div className="grid grid-cols-1 gap-2">
+                                    {shiftTypes.map(type => (
+                                        <button key={type.id} onClick={() => addShift(type)} className="flex items-center justify-between p-3 border dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all active:scale-[0.98] group">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-3 h-3 rounded-full ${type.color} ring-2 ring-offset-1 dark:ring-offset-slate-800 ring-transparent group-hover:ring-${type.color.split('-')[1]}-200`} />
+                                                <span className="font-semibold text-slate-700 dark:text-slate-200">{type.name}</span>
+                                            </div>
+                                            <span className="text-sm font-medium text-slate-500 dark:text-slate-400">{formatCurrency(type.value)}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="pt-4 border-t dark:border-slate-700">
+                                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Agendados</h4>
+                                {selectedDay && getShiftsForDay(selectedDay.getDate()).length === 0 ? (
+                                    <div className="text-center py-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-dashed dark:border-slate-700"><p className="text-sm text-slate-400 italic">Dia livre.</p></div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {selectedDay && getShiftsForDay(selectedDay.getDate()).map(shift => {
+                                            const type = shiftTypes.find(t => t.id === shift.typeId);
+                                            return (
+                                                <div key={shift.id} className="flex justify-between items-center bg-white dark:bg-slate-700/30 border dark:border-slate-700 p-3 rounded-xl shadow-sm">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`w-2 h-2 rounded-full ${type?.color}`} />
+                                                        <div className="flex flex-col">
+                                                            <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{type?.name}</span>
+                                                            <div className="flex items-center gap-1 text-slate-400 text-xs"><span>R$</span><input type="number" step="0.01" className="bg-transparent border-b border-dashed border-slate-300 focus:border-blue-500 outline-none w-16 text-slate-600 dark:text-slate-300" value={shift.value} onChange={(e) => updateShiftValue(shift.id, e.target.value)} /></div>
+                                                        </div>
+                                                    </div>
+                                                    <button onClick={() => removeShift(shift.id)} className="text-red-400 hover:bg-red-50 hover:text-red-600 p-2 rounded-lg transition-colors"><Trash2 size={18} /></button>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </Modal>
+
+                    <Modal isOpen={isScaleModalOpen} onClose={() => setIsScaleModalOpen(false)} title="Gerenciar Escalas">
+                        <div>
+                            <div className="flex mb-5 bg-slate-100 dark:bg-slate-900/50 p-1 rounded-xl">
+                                <button onClick={() => setScaleMode('generate')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${scaleMode === 'generate' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-white' : 'text-slate-500'}`}>Criar Escala</button>
+                                <button onClick={() => setScaleMode('delete')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${scaleMode === 'delete' ? 'bg-white dark:bg-slate-700 shadow-sm text-red-500' : 'text-slate-500'}`}>Limpar Período</button>
+                            </div>
+                            {scaleMode === 'generate' && (
+                                <div className="space-y-6">
+                                    {savedScales.length > 0 && (
+                                        <div>
+                                            <h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">Modelos Salvos</h4>
+                                            <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
+                                                {savedScales.map(scale => (
+                                                    <div key={scale.id} className="flex-shrink-0 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-lg p-2 flex items-center gap-2 group">
+                                                        <button onClick={() => setScalePattern(scale.pattern)} className="text-xs font-medium text-slate-700 dark:text-white hover:text-blue-600 flex flex-col items-start"><span>{scale.name}</span><span className="text-[9px] text-slate-400">{scale.pattern.length} passos</span></button>
+                                                        <button onClick={() => { if(confirm('Remover modelo?')) setSavedScales(savedScales.filter(s => s.id !== scale.id)) }} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><X size={12} /></button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div>
+                                        <div className="flex justify-between items-center mb-2"><label className="text-xs font-bold text-slate-500">Sequência (Padrão)</label>{scalePattern.length > 0 && (<button onClick={() => setScalePattern([])} className="text-xs text-red-500 hover:underline">Limpar</button>)}</div>
+                                        <div className="flex gap-2 overflow-x-auto pb-4 mb-3 min-h-[60px] items-center border border-dashed rounded-xl p-2 bg-slate-50 dark:bg-slate-900/50 dark:border-slate-700">
+                                            {scalePattern.length === 0 && <span className="text-xs text-slate-400 italic mx-auto">Adicione plantões e folgas abaixo...</span>}
+                                            {scalePattern.map((step, idx) => {
+                                                const type = shiftTypes.find(t => t.id === step.shiftTypeId);
+                                                return (
+                                                    <div key={idx} className="flex-shrink-0 flex flex-col items-center animate-in zoom-in duration-200">
+                                                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center border-2 shadow-sm ${step.type === 'shift' ? `${type?.color} border-transparent text-white` : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-400'}`}><span className="text-[10px] font-bold">{step.type === 'shift' ? 'T' : 'F'}</span></div>
+                                                        <span className="text-[9px] text-slate-400 mt-1 font-mono">{idx + 1}</span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <button onClick={() => setScalePattern([...scalePattern, { type: 'off', shiftTypeId: null }])} className="p-3 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-600 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700 font-bold text-xs transition-colors">+ FOLGA</button>
+                                            
+                                            {/* DROPDOWN CORRIGIDO */}
+                                            <div className="relative">
+                                                <button onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="w-full h-full p-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-bold text-xs hover:bg-blue-100 transition-colors border border-blue-100 dark:border-blue-900/30">+ PLANTÃO</button>
+                                                {isDropdownOpen && (
+                                                    <>
+                                                        <div className="fixed inset-0 z-10" onClick={() => setIsDropdownOpen(false)} />
+                                                        <div className="absolute bottom-full right-0 w-48 mb-2 bg-white dark:bg-slate-800 rounded-xl shadow-xl border dark:border-slate-600 p-2 z-20 animate-in slide-in-from-bottom-2">
+                                                            {shiftTypes.map(type => (
+                                                                <button key={type.id} onClick={() => { setScalePattern([...scalePattern, { type: 'shift', shiftTypeId: type.id }]); setIsDropdownOpen(false); }} className="w-full text-left p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-white flex items-center gap-2">
+                                                                    <div className={`w-2 h-2 rounded-full ${type.color}`} /> {type.name}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
+
+                                        </div>
+                                        <div className="flex gap-2 mt-4 items-center">
+                                            <input placeholder="Nome para salvar (Ex: 12x36)" value={scaleName} onChange={e => setScaleName(e.target.value)} className="flex-1 text-xs p-2 bg-transparent border-b border-slate-200 focus:border-blue-500 outline-none dark:border-slate-700 dark:text-white" />
+                                            <button onClick={() => { if(!scaleName || scalePattern.length === 0) return alert('Defina nome e padrão'); setSavedScales([...savedScales, { id: Date.now().toString(), name: scaleName, pattern: scalePattern }]); setScaleName(''); alert('Modelo salvo!'); }} className="text-slate-400 hover:text-blue-600 p-2"><Save size={18} /></button>
+                                        </div>
+                                    </div>
+                                    <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border dark:border-slate-700">
+                                        <div className="grid grid-cols-2 gap-4 mb-4">
+                                            <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Início</label><input type="date" value={scaleStartDate} onChange={(e) => setScaleStartDate(e.target.value)} className="w-full p-2 rounded-lg bg-white dark:bg-slate-800 border dark:border-slate-600 dark:text-white text-xs shadow-sm" /></div>
+                                            <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Fim</label><input type="date" value={scaleEndDate} onChange={(e) => setScaleEndDate(e.target.value)} className="w-full p-2 rounded-lg bg-white dark:bg-slate-800 border dark:border-slate-600 dark:text-white text-xs shadow-sm" /></div>
+                                        </div>
+                                        <button onClick={generateScaleShifts} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-blue-600/20 active:scale-[0.98] flex items-center justify-center gap-2"><CalendarDays size={18} /> Gerar Escala</button>
+                                    </div>
+                                </div>
+                            )}
+                            {scaleMode === 'delete' && (
+                                <div className="space-y-4">
+                                    <div className="bg-red-50 dark:bg-red-900/10 p-4 rounded-xl border border-red-100 dark:border-red-900/30 flex gap-3 items-start"><Eraser className="text-red-500 mt-1 shrink-0" size={18} /><p className="text-xs text-red-600 dark:text-red-400 leading-relaxed">Selecione o período e o tipo de plantão para remover. Esta ação não pode ser desfeita.</p></div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">De</label><input type="date" value={scaleStartDate} onChange={(e) => setScaleStartDate(e.target.value)} className="w-full p-2 rounded-lg bg-white dark:bg-slate-800 border dark:border-slate-600 dark:text-white text-xs" /></div>
+                                        <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Até</label><input type="date" value={scaleEndDate} onChange={(e) => setScaleEndDate(e.target.value)} className="w-full p-2 rounded-lg bg-white dark:bg-slate-800 border dark:border-slate-600 dark:text-white text-xs" /></div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Filtrar Tipo</label>
+                                        <select value={deleteTypeFilter} onChange={(e) => setDeleteTypeFilter(e.target.value)} className="w-full p-2 rounded-lg bg-white dark:bg-slate-800 border dark:border-slate-600 dark:text-white text-xs">
+                                            <option value="all">Remover Todos</option>
+                                            {shiftTypes.map(t => <option key={t.id} value={t.id}>Apenas {t.name}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="bg-slate-50 dark:bg-slate-800 rounded-xl border dark:border-slate-700 overflow-hidden max-h-40 flex flex-col">
+                                        <div className="px-3 py-2 bg-slate-100 dark:bg-slate-900/50 text-[10px] font-bold text-slate-500 uppercase flex justify-between"><span>Preview</span><span>{shiftsToDeletePreview.length} itens</span></div>
+                                        <div className="overflow-y-auto p-2 custom-scrollbar flex-1">{shiftsToDeletePreview.length === 0 ? (<p className="text-center text-xs text-slate-400 py-4">Vazio.</p>) : (shiftsToDeletePreview.map(s => (<div key={s.id} className="flex justify-between text-xs p-1.5 border-b last:border-0 border-slate-100 dark:border-slate-700/50"><span className="font-mono text-slate-500">{s.date.split('-').reverse().slice(0,2).join('/')}</span><span className="font-medium">{shiftTypes.find(t => t.id === s.typeId)?.name}</span></div>)))}</div>
+                                    </div>
+                                    <button onClick={deleteShiftsInInterval} disabled={shiftsToDeletePreview.length === 0} className="w-full bg-red-500 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-red-500/20 mt-2">Confirmar Remoção</button>
+                                </div>
+                            )}
+                        </div>
+                    </Modal>
+
+                    <Modal isOpen={isTypeModalOpen} onClose={() => setIsTypeModalOpen(false)} title={editingType ? "Editar Tipo" : "Novo Tipo"}>
+                        <form onSubmit={(e) => {
+                            e.preventDefault();
+                            const formData = new FormData(e.target);
+                            const data = { name: formData.get('name'), value: parseFloat(formData.get('value')), duration: parseInt(formData.get('duration')), color: formData.get('color') };
+                            if (editingType) { setShiftTypes(shiftTypes.map(t => t.id === editingType.id ? { ...t, ...data } : t)); } else { setShiftTypes([...shiftTypes, { id: Date.now().toString(), ...data }]); }
+                            setIsTypeModalOpen(false); setEditingType(null);
+                        }} className="space-y-4">
+                            <div><label className="label-text">Nome do Plantão</label><input name="name" required placeholder="Ex: Extra UTI" defaultValue={editingType?.name} className="input-field" /></div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div><label className="label-text">Valor (R$)</label><input name="value" type="number" step="0.01" required placeholder="0.00" defaultValue={editingType?.value} className="input-field" /></div>
+                                <div><label className="label-text">Duração (h)</label><input name="duration" type="number" required defaultValue={editingType?.duration || 12} className="input-field" /></div>
+                            </div>
+                            <div>
+                                <label className="label-text mb-2 block">Cor da Etiqueta</label>
+                                <div className="flex gap-3 flex-wrap">
+                                    {['bg-blue-500', 'bg-emerald-500', 'bg-rose-500', 'bg-amber-500', 'bg-purple-500', 'bg-slate-500', 'bg-indigo-500', 'bg-pink-500'].map(c => (
+                                        <label key={c} className={`w-8 h-8 rounded-full ${c} cursor-pointer relative flex items-center justify-center shadow-sm transition-transform hover:scale-110`}>
+                                            <input type="radio" name="color" value={c} className="peer opacity-0 absolute" defaultChecked={editingType ? editingType.color === c : c === 'bg-blue-500'} />
+                                            <div className="hidden peer-checked:block text-white scale-125 transition-transform"><Check size={14} strokeWidth={3} /></div>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-colors mt-2 shadow-lg shadow-blue-600/20">{editingType ? 'Salvar Alterações' : 'Criar Tipo'}</button>
+                        </form>
+                    </Modal>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
