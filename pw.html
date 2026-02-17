@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CriptoLabs V3 - Brain Wallet Determinística</title>
+    <style>
+        :root {
+            --bg: #0b0f1a;
+            --card-bg: #161b2c;
+            --primary: #38bdf8;
+            --text: #e2e8f0;
+            --accent: #818cf8;
+            --danger: #f87171;
+            --warning: #fbbf24;
+            --success: #34d399;
+            --border: #2d3748;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container { max-width: 950px; width: 100%; }
+
+        header { text-align: center; margin-bottom: 2rem; }
+        header h1 { color: var(--primary); font-size: 2rem; margin-bottom: 0.5rem; }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+            margin-bottom: 24px;
+            border: 1px solid var(--border);
+        }
+
+        h2 { margin-top: 0; font-size: 1.1rem; color: var(--primary); text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 20px; }
+
+        .input-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: 500; font-size: 0.85rem; color: var(--accent); }
+
+        textarea {
+            width: 100%;
+            padding: 14px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: #0b0f1a;
+            color: #fff;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 1.1rem;
+            resize: vertical;
+            box-sizing: border-box;
+            min-height: 100px;
+            transition: border-color 0.2s;
+        }
+
+        textarea:focus { outline: none; border-color: var(--primary); }
+
+        .controls-grid {
+            display: grid;
+            grid-template-columns: 1.5fr 1fr;
+            gap: 24px;
+        }
+
+        @media (max-width: 768px) { .controls-grid { grid-template-columns: 1fr; } }
+
+        .length-control {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: #0b0f1a;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        input[type="range"] { flex-grow: 1; cursor: pointer; accent-color: var(--primary); }
+        
+        input[type="number"] {
+            width: 80px;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            color: white;
+            padding: 6px;
+            border-radius: 4px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .checkbox-group { display: flex; flex-direction: column; gap: 10px; }
+        .checkbox-item { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 0.9rem; }
+
+        .strength-container { margin: 20px 0; }
+        .strength-bar-bg { height: 6px; background: #1e293b; border-radius: 3px; overflow: hidden; margin-bottom: 8px; }
+        #strength-bar { height: 100%; width: 0%; transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s; }
+
+        .crypto-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
+
+        .hash-box {
+            background: #0b0f1a;
+            padding: 16px;
+            border-radius: 8px;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85rem;
+            word-break: break-all;
+            border: 1px solid var(--border);
+            position: relative;
+        }
+
+        .hash-label {
+            position: absolute;
+            top: -10px;
+            left: 12px;
+            background: var(--bg);
+            padding: 2px 8px;
+            font-size: 0.65rem;
+            font-weight: bold;
+            color: var(--primary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+
+        button {
+            background: var(--primary);
+            color: #0b0f1a;
+            border: none;
+            padding: 14px 24px;
+            border-radius: 8px;
+            font-weight: 800;
+            cursor: pointer;
+            width: 100%;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.2s;
+        }
+
+        button:hover { opacity: 0.9; transform: translateY(-1px); }
+        button:active { transform: translateY(0); }
+
+        .metric-row { display: flex; justify-content: space-between; font-size: 0.75rem; color: #94a3b8; }
+        .metric-row b { color: var(--text); }
+
+        .wif-value { color: var(--success); font-weight: bold; font-size: 0.95rem; }
+
+        .warning-footer {
+            background: rgba(248, 113, 113, 0.1);
+            color: var(--danger);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--danger);
+            font-size: 0.85rem;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>CriptoLabs V3</h1>
+        <p>Gerador de Senhas & Chaves Bitcoin Determinísticas (Brain Wallet)</p>
+    </header>
+
+    <div class="card">
+        <h2>1. Entrada de Dados</h2>
+        
+        <div class="input-group">
+            <label for="pwd-input">Senha / Passphrase (digite aqui para analisar ou clique em gerar)</label>
+            <textarea id="pwd-input" spellcheck="false" placeholder="Ex: minha frase secreta muito longa..."></textarea>
+            
+            <div class="strength-container">
+                <div class="strength-bar-bg"><div id="strength-bar"></div></div>
+                <div class="metric-row">
+                    <span id="strength-text">Força: ---</span>
+                    <span>Caracteres: <b id="char-count">0</b></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls-grid">
+            <div>
+                <label>Comprimento da Geração Aleatória</label>
+                <div class="length-control">
+                    <input type="range" id="len-slider" min="4" max="256" value="32">
+                    <input type="number" id="len-num" min="1" max="10000" value="32">
+                </div>
+                <div class="metric-row" style="margin-top: 10px;">
+                    <span>Entropia Estimada: <b id="entropy-val">0</b> bits</span>
+                </div>
+            </div>
+
+            <div class="checkbox-group">
+                <label class="checkbox-item"><input type="radio" name="pool" value="alpha"> Apenas Letras</label>
+                <label class="checkbox-item"><input type="radio" name="pool" value="alphanum"> Letras + Números</label>
+                <label class="checkbox-item"><input type="radio" name="pool" value="full" checked> Completo (+Especiais)</label>
+                <label class="checkbox-item"><input type="checkbox" id="inc-space"> Incluir Espaços</label>
+            </div>
+        </div>
+
+        <button id="gen-btn" style="margin-top: 24px;">Gerar Senha Aleatória Segura</button>
+    </div>
+
+    <div class="card">
+        <h2>2. Saídas Determinísticas (Sem Salt)</h2>
+        
+        <div class="crypto-grid">
+            <div class="hash-box">
+                <span class="hash-label">Hash MD5</span>
+                <div id="md5-out" style="color: #94a3b8;">---</div>
+            </div>
+            
+            <div class="hash-box">
+                <span class="hash-label">Hash SHA-256 (Private Key Hex)</span>
+                <div id="sha256-out" style="color: var(--accent);">---</div>
+            </div>
+
+            <div class="hash-box">
+                <span class="hash-label">WIF Uncompressed (Padrão Antigo)</span>
+                <div id="wif-uncompressed" class="wif-value">---</div>
+            </div>
+
+            <div class="hash-box">
+                <span class="hash-label">WIF Compressed (Padrão Moderno)</span>
+                <div id="wif-compressed" class="wif-value">---</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card warning-footer">
+        <strong>⚠️ RISCO DE SEGURANÇA DETERMINÍSTICA:</strong><br>
+        Esta página gera chaves privadas Bitcoin usando o hash direto da sua senha. Isso significa que a mesma senha <strong>sempre</strong> resultará na mesma chave privada. Se você usar uma senha comum (ex: "123456" ou "senha123"), seus fundos serão roubados instantaneamente por bots. Use apenas passphrases longas e aleatórias.
+    </div>
+</div>
+
+<script>
+    const ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const NUMBERS = "0123456789";
+    const SPECIALS = "!@#$%^&*()_+-=[]{}|;:,.<>?";
+    const B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+
+    const dom = {
+        input: document.getElementById('pwd-input'),
+        slider: document.getElementById('len-slider'),
+        numInput: document.getElementById('len-num'),
+        genBtn: document.getElementById('gen-btn'),
+        charCount: document.getElementById('char-count'),
+        strengthBar: document.getElementById('strength-bar'),
+        strengthText: document.getElementById('strength-text'),
+        entropyVal: document.getElementById('entropy-val'),
+        md5Out: document.getElementById('md5-out'),
+        sha256Out: document.getElementById('sha256-out'),
+        wifUncompressed: document.getElementById('wif-uncompressed'),
+        wifCompressed: document.getElementById('wif-compressed'),
+        poolRadios: document.getElementsByName('pool'),
+        incSpace: document.getElementById('inc-space')
+    };
+
+    /**
+     * MD5 Implementation
+     */
+    function md5(s) {
+        function k(n) { return Math.abs(Math.sin(n + 1)) * 4294967296 >>> 0; }
+        let shifts = [7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21];
+        let h = [0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476];
+        let b = new TextEncoder().encode(s);
+        let len = (b.length + 8 >> 6) + 1 << 4;
+        let m = new Uint32Array(len);
+        for (let i = 0; i < b.length; i++) m[i >> 2] |= b[i] << (i % 4 << 3);
+        m[b.length >> 2] |= 0x80 << (b.length % 4 << 3);
+        m[len - 2] = b.length << 3;
+        for (let i = 0; i < len; i += 16) {
+            let [a, b, c, d] = h;
+            for (let j = 0; j < 64; j++) {
+                let f, g;
+                if (j < 16) { f = (b & c) | (~b & d); g = j; }
+                else if (j < 32) { f = (d & b) | (~d & c); g = (5 * j + 1) % 16; }
+                else if (j < 48) { f = b ^ c ^ d; g = (3 * j + 5) % 16; }
+                else { f = c ^ (b | ~d); g = (7 * j) % 16; }
+                let t = d; d = c; c = b;
+                b = (b + ((a + f + k(j) + m[i + g]) << shifts[j] | (a + f + k(j) + m[i + g]) >>> 32 - shifts[j])) >>> 0;
+                a = t;
+            }
+            h[0] = h[0] + a >>> 0; h[1] = h[1] + b >>> 0; h[2] = h[2] + c >>> 0; h[3] = h[3] + d >>> 0;
+        }
+        return Array.from(new Uint8Array(new Uint32Array(h).buffer)).map(x => x.toString(16).padStart(2, '0')).join('');
+    }
+
+    /**
+     * Crypto Logic
+     */
+    function getActivePool() {
+        let mode = 'full';
+        for(const r of dom.poolRadios) if(r.checked) mode = r.value;
+        let p = ALPHABET;
+        if(mode === 'alphanum') p += NUMBERS;
+        if(mode === 'full') p += NUMBERS + SPECIALS;
+        if(dom.incSpace.checked) p += " ";
+        return p;
+    }
+
+    function generate() {
+        const len = parseInt(dom.numInput.value) || 32;
+        const pool = getActivePool();
+        const rand = new Uint32Array(len);
+        window.crypto.getRandomValues(rand);
+        let s = "";
+        for(let i=0; i<len; i++) s += pool[rand[i] % pool.length];
+        dom.input.value = s;
+        update();
+    }
+
+    function base58Encode(buffer) {
+        let x = BigInt(0);
+        for (const b of buffer) x = x * 256n + BigInt(b);
+        let res = "";
+        while (x > 0n) {
+            res = B58[Number(x % 58n)] + res;
+            x /= 58n;
+        }
+        for (let i = 0; i < buffer.length && buffer[i] === 0; i++) res = '1' + res;
+        return res;
+    }
+
+    async function doubleSha256(uint8) {
+        const h1 = await crypto.subtle.digest('SHA-256', uint8);
+        return await crypto.subtle.digest('SHA-256', h1);
+    }
+
+    async function update() {
+        const val = dom.input.value;
+        const len = val.length;
+        
+        dom.charCount.innerText = len;
+        dom.numInput.value = len;
+        if(len <= 256) dom.slider.value = len;
+
+        // Entropy Calc
+        const poolSize = getActivePool().length;
+        const entropy = len > 0 ? len * Math.log2(poolSize) : 0;
+        dom.entropyVal.innerText = entropy.toFixed(2);
+
+        // Strength UI
+        let color = '#f87171';
+        let label = 'Muito Fraca';
+        let width = Math.min(len * 2, 20) + '%';
+        if(entropy > 120) { color = '#34d399'; label = 'Militar (Paranóico)'; width = '100%'; }
+        else if(entropy > 80) { color = '#34d399'; label = 'Forte'; width = '85%'; }
+        else if(entropy > 60) { color = '#fbbf24'; label = 'Moderada'; width = '60%'; }
+        else if(entropy > 40) { color = '#f87171'; label = 'Fraca'; width = '30%'; }
+        
+        dom.strengthBar.style.width = width;
+        dom.strengthBar.style.backgroundColor = color;
+        dom.strengthText.innerText = `Força: ${label}`;
+        dom.strengthText.style.color = color;
+
+        if(len > 0) {
+            // MD5
+            dom.md5Out.innerText = md5(val);
+
+            // Private Key (SHA-256 da senha)
+            const seedBuffer = new TextEncoder().encode(val);
+            const privKeyBuffer = await crypto.subtle.digest('SHA-256', seedBuffer);
+            const privKey = new Uint8Array(privKeyBuffer);
+            dom.sha256Out.innerText = Array.from(privKey).map(b => b.toString(16).padStart(2, '0')).join('');
+
+            // WIF Uncompressed
+            // [0x80] + [32 bytes priv] + [4 bytes checksum]
+            const payloadUn = new Uint8Array(33);
+            payloadUn[0] = 0x80;
+            payloadUn.set(privKey, 1);
+            const checkUn = new Uint8Array(await doubleSha256(payloadUn)).slice(0, 4);
+            const finalUn = new Uint8Array(37);
+            finalUn.set(payloadUn);
+            finalUn.set(checkUn, 33);
+            dom.wifUncompressed.innerText = base58Encode(finalUn);
+
+            // WIF Compressed
+            // [0x80] + [32 bytes priv] + [0x01] + [4 bytes checksum]
+            const payloadCo = new Uint8Array(34);
+            payloadCo[0] = 0x80;
+            payloadCo.set(privKey, 1);
+            payloadCo[33] = 0x01;
+            const checkCo = new Uint8Array(await doubleSha256(payloadCo)).slice(0, 4);
+            const finalCo = new Uint8Array(38);
+            finalCo.set(payloadCo);
+            finalCo.set(checkCo, 34);
+            dom.wifCompressed.innerText = base58Encode(finalCo);
+
+        } else {
+            dom.md5Out.innerText = "---";
+            dom.sha256Out.innerText = "---";
+            dom.wifUncompressed.innerText = "---";
+            dom.wifCompressed.innerText = "---";
+        }
+    }
+
+    /**
+     * Events
+     */
+    dom.genBtn.onclick = generate;
+    dom.input.oninput = update;
+    dom.slider.oninput = () => { dom.numInput.value = dom.slider.value; generate(); };
+    dom.numInput.oninput = () => { if(dom.numInput.value > 0) { if(dom.numInput.value <= 256) dom.slider.value = dom.numInput.value; generate(); } };
+    [...dom.poolRadios, dom.incSpace].forEach(r => r.onchange = () => { if(dom.input.value) generate(); });
+
+    // Init
+    generate();
+</script>
+</body>
+</html>
