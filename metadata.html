@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Digital Forensic Metadata Analysis Suite</title>
+<style>
+    body{
+        margin:0;
+        background:#0f1115;
+        color:#e4e4e4;
+        font-family:Consolas, monospace;
+    }
+    header{
+        padding:20px;
+        background:#151922;
+        border-bottom:1px solid #333;
+    }
+    h1{
+        margin:0;
+        font-size:20px;
+        letter-spacing:1px;
+    }
+    #dropzone{
+        margin:20px;
+        padding:40px;
+        border:2px dashed #3a3f4b;
+        text-align:center;
+        cursor:pointer;
+    }
+    #dropzone.hover{
+        border-color:#00ffcc;
+        background:#151922;
+    }
+    .notice{
+        font-size:13px;
+        color:#8bc34a;
+        margin-top:10px;
+    }
+    .file-container{
+        margin:20px;
+        padding:15px;
+        border:1px solid #333;
+        background:#151922;
+    }
+    .file-header{
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+    }
+    button{
+        background:#222;
+        color:#fff;
+        border:1px solid #444;
+        padding:5px 10px;
+        cursor:pointer;
+    }
+    button:hover{
+        background:#333;
+    }
+    details{
+        margin-top:10px;
+        border-top:1px solid #2c313c;
+        padding-top:10px;
+    }
+    summary{
+        cursor:pointer;
+        font-weight:bold;
+    }
+    .warning{
+        color:#ff4c4c;
+        font-weight:bold;
+    }
+    .hex{
+        font-size:12px;
+        white-space:pre;
+        background:#0d0f14;
+        padding:10px;
+        overflow:auto;
+        max-height:300px;
+        border:1px solid #333;
+    }
+    table{
+        border-collapse:collapse;
+        font-size:13px;
+    }
+    td, th{
+        border:1px solid #333;
+        padding:4px 8px;
+    }
+</style>
+</head>
+<body>
+<header>
+    <h1>Digital Forensic Metadata Analysis Suite</h1>
+    <div class="notice">Arquivos nunca deixam seu navegador.</div>
+</header>
+
+<div id="dropzone">
+    Arraste arquivos aqui ou clique para selecionar
+    <input type="file" id="fileInput" multiple style="display:none">
+</div>
+
+<div id="results"></div>
+
+<script>
+/* ================================
+   UTILITÁRIOS GERAIS
+================================ */
+
+function formatBytes(bytes){
+    const sizes = ['Bytes','KB','MB','GB'];
+    if(bytes===0) return '0 Byte';
+    const i = parseInt(Math.floor(Math.log(bytes)/Math.log(1024)));
+    return (bytes/Math.pow(1024,i)).toFixed(2)+' '+sizes[i];
+}
+
+function toHex(buffer){
+    return [...new Uint8Array(buffer)]
+        .map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+function readFile(file){
+    return new Promise((resolve,reject)=>{
+        const reader=new FileReader();
+        reader.onload=()=>resolve(reader.result);
+        reader.onerror=reject;
+        reader.readAsArrayBuffer(file);
+    });
+}
+
+/* ================================
+   MD5 IMPLEMENTAÇÃO MANUAL
+================================ */
+function md5(arrayBuffer){
+    // implementação compacta baseada no algoritmo RFC1321
+    function cmn(q,a,b,x,s,t){a=(a+q+x+t)|0;return (((a<<s)|(a>>>(32-s)))+b)|0;}
+    function ff(a,b,c,d,x,s,t){return cmn((b&c)|((~b)&d),a,b,x,s,t);}
+    function gg(a,b,c,d,x,s,t){return cmn((b&d)|(c&(~d)),a,b,x,s,t);}
+    function hh(a,b,c,d,x,s,t){return cmn(b^c^d,a,b,x,s,t);}
+    function ii(a,b,c,d,x,s,t){return cmn(c^(b|(~d)),a,b,x,s,t);}
+    function md5cycle(x,k){
+        let [a,b,c,d]=x;
+        a=ff(a,b,c,d,k[0],7,-680876936);
+        d=ff(d,a,b,c,k[1],12,-389564586);
+        c=ff(c,d,a,b,k[2],17,606105819);
+        b=ff(b,c,d,a,k[3],22,-1044525330);
+        a=gg(a,b,c,d,k[1],5,-165796510);
+        d=gg(d,a,b,c,k[6],9,-1069501632);
+        c=gg(c,d,a,b,k[11],14,643717713);
+        b=gg(b,c,d,a,k[0],20,-373897302);
+        x[0]=(x[0]+a)|0;
+        x[1]=(x[1]+b)|0;
+        x[2]=(x[2]+c)|0;
+        x[3]=(x[3]+d)|0;
+    }
+    function md51(s){
+        let n=s.length;
+        let state=[1732584193,-271733879,-1732584194,271733878];
+        let i;
+        for(i=64;i<=n;i+=64)
+            md5cycle(state,md5blk(s.substring(i-64,i)));
+        s=s.substring(i-64);
+        let tail=Array(16).fill(0);
+        for(i=0;i<s.length;i++)
+            tail[i>>2]|=s.charCodeAt(i)<<(i%4<<3);
+        tail[i>>2]|=0x80<<(i%4<<3);
+        if(i>55){
+            md5cycle(state,tail);
+            tail=Array(16).fill(0);
+        }
+        tail[14]=n*8;
+        md5cycle(state,tail);
+        return state;
+    }
+    function md5blk(s){
+        let md5blks=[];
+        for(let i=0;i<64;i+=4)
+            md5blks[i>>2]=s.charCodeAt(i)
+            +(s.charCodeAt(i+1)<<8)
+            +(s.charCodeAt(i+2)<<16)
+            +(s.charCodeAt(i+3)<<24);
+        return md5blks;
+    }
+    function rhex(n){
+        let s='',j=0;
+        for(;j<4;j++)
+            s+=((n>>>(j*8+4))&0x0F).toString(16)
+            +((n>>>(j*8))&0x0F).toString(16);
+        return s;
+    }
+    let txt='';
+    let arr=new Uint8Array(arrayBuffer);
+    for(let i=0;i<arr.length;i++) txt+=String.fromCharCode(arr[i]);
+    return md51(txt).map(rhex).join('');
+}
+
+/* ================================
+   ENTROPIA
+================================ */
+function calculateEntropy(buffer){
+    const bytes=new Uint8Array(buffer);
+    const freq=new Array(256).fill(0);
+    for(let b of bytes) freq[b]++;
+    let entropy=0;
+    for(let f of freq){
+        if(f===0) continue;
+        let p=f/bytes.length;
+        entropy-=p*Math.log2(p);
+    }
+    return entropy;
+}
+
+/* ================================
+   EXTRAÇÃO DE STRINGS
+================================ */
+function extractStrings(buffer){
+    const bytes=new Uint8Array(buffer);
+    let result=[], current='';
+    for(let b of bytes){
+        if(b>=32 && b<=126){
+            current+=String.fromCharCode(b);
+        }else{
+            if(current.length>=4) result.push(current);
+            current='';
+        }
+    }
+    if(current.length>=4) result.push(current);
+    return result;
+}
+
+/* ================================
+   DETECÇÃO MAGIC NUMBER
+================================ */
+function detectSignature(buffer){
+    const hex=toHex(buffer.slice(0,16)).toUpperCase();
+    if(hex.startsWith("FFD8FF")) return "JPEG";
+    if(hex.startsWith("89504E47")) return "PNG";
+    if(hex.startsWith("25504446")) return "PDF";
+    if(hex.startsWith("504B0304")) return "ZIP";
+    return "Desconhecido";
+}
+
+/* ================================
+   PARSER PNG
+================================ */
+function parsePNG(buffer){
+    const view=new DataView(buffer);
+    let offset=8;
+    let chunks=[];
+    while(offset<buffer.byteLength){
+        let length=view.getUint32(offset);
+        let type=String.fromCharCode(
+            view.getUint8(offset+4),
+            view.getUint8(offset+5),
+            view.getUint8(offset+6),
+            view.getUint8(offset+7)
+        );
+        chunks.push({type,length});
+        offset+=12+length;
+        if(type==="IEND") break;
+    }
+    return chunks;
+}
+
+/* ================================
+   PARSER PDF
+================================ */
+function parsePDF(buffer){
+    const text=new TextDecoder().decode(buffer);
+    let info={};
+    let version=/PDF-(\d\.\d)/.exec(text);
+    if(version) info.version=version[1];
+    ["Title","Author","Creator","Producer","CreationDate","ModDate"].forEach(k=>{
+        let r=new RegExp("\\/"+k+"\\s*\\((.*?)\\)");
+        let m=r.exec(text);
+        if(m) info[k]=m[1];
+    });
+    if(/\/JavaScript/.test(text)) info.js=true;
+    if(/\/EmbeddedFiles/.test(text)) info.embedded=true;
+    let xmp=/<x:xmpmeta[\s\S]*?<\/x:xmpmeta>/.exec(text);
+    if(xmp) info.xmp=xmp[0];
+    return info;
+}
+
+/* ================================
+   HASHES
+================================ */
+async function computeHash(buffer,algo){
+    let start=performance.now();
+    let result;
+    if(algo==="MD5"){
+        result=md5(buffer);
+    }else{
+        let digest=await crypto.subtle.digest(algo,buffer);
+        result=toHex(digest);
+    }
+    let end=performance.now();
+    return {hash:result,time:(end-start).toFixed(2)};
+}
+
+/* ================================
+   UI E FLUXO
+================================ */
+const dropzone=document.getElementById("dropzone");
+const input=document.getElementById("fileInput");
+const results=document.getElementById("results");
+
+dropzone.onclick=()=>input.click();
+dropzone.ondragover=e=>{e.preventDefault();dropzone.classList.add("hover");}
+dropzone.ondragleave=()=>dropzone.classList.remove("hover");
+dropzone.ondrop=e=>{
+    e.preventDefault();
+    dropzone.classList.remove("hover");
+    handleFiles(e.dataTransfer.files);
+};
+input.onchange=()=>handleFiles(input.files);
+
+function wipeBuffer(buffer){
+    let arr=new Uint8Array(buffer);
+    arr.fill(0);
+}
+
+async function handleFiles(files){
+    for(let file of files){
+        let container=document.createElement("div");
+        container.className="file-container";
+        container.innerHTML=`<div class="file-header">
+            <div><strong>${file.name}</strong></div>
+            <button>Remover</button>
+        </div>`;
+        results.appendChild(container);
+
+        container.querySelector("button").onclick=()=>{
+            container.remove();
+        };
+
+        let buffer=await readFile(file);
+
+        let signature=detectSignature(buffer);
+        let entropy=calculateEntropy(buffer);
+
+        container.innerHTML+=`
+        <details open>
+            <summary>Informações Básicas</summary>
+            Nome: ${file.name}<br>
+            Tamanho: ${file.size} bytes (${formatBytes(file.size)})<br>
+            MIME: ${file.type||"Indefinido"}<br>
+            Última modificação: ${new Date(file.lastModified).toISOString()}<br>
+            Assinatura detectada: ${signature}
+        </details>
+        `;
+
+        if(file.type && !file.type.toUpperCase().includes(signature)){
+            container.innerHTML+=`<div class="warning">⚠ Mismatch entre MIME declarado e assinatura detectada</div>`;
+        }
+
+        /* HASHES */
+        let hashesSection=document.createElement("details");
+        hashesSection.open=false;
+        hashesSection.innerHTML="<summary>Hashes</summary>Calculando...";
+        container.appendChild(hashesSection);
+
+        let sha256=await computeHash(buffer,"SHA-256");
+        let sha512=await computeHash(buffer,"SHA-512");
+        let sha1=await computeHash(buffer,"SHA-1");
+        let md5hash=await computeHash(buffer,"MD5");
+
+        hashesSection.innerHTML=`
+        <summary>Hashes</summary>
+        SHA-256: ${sha256.hash}<br>Tempo: ${sha256.time} ms<br><br>
+        SHA-512: ${sha512.hash}<br>Tempo: ${sha512.time} ms<br><br>
+        SHA-1: ${sha1.hash}<br>Tempo: ${sha1.time} ms<br><br>
+        MD5: ${md5hash.hash}<br>Tempo: ${md5hash.time} ms
+        `;
+
+        /* HEX */
+        let hexSection=document.createElement("details");
+        hexSection.innerHTML="<summary>Hex Viewer (256 bytes)</summary>";
+        let hexDiv=document.createElement("div");
+        hexDiv.className="hex";
+        hexDiv.textContent=toHex(buffer.slice(0,256));
+        hexSection.appendChild(hexDiv);
+        container.appendChild(hexSection);
+
+        /* STRINGS */
+        let strings=extractStrings(buffer);
+        let strSection=document.createElement("details");
+        strSection.innerHTML=`<summary>Strings ASCII (≥4)</summary>${strings.join("<br>")}`;
+        container.appendChild(strSection);
+
+        /* ENTROPIA */
+        container.innerHTML+=`
+        <details>
+            <summary>Entropia</summary>
+            Entropia Shannon: ${entropy.toFixed(4)}<br>
+            ${entropy>7.5 ? "<span class='warning'>Alta entropia: possível criptografia/packing</span>" :
+            entropy<4 ? "Baixa entropia: conteúdo estruturado ou texto" :
+            "Entropia moderada"}
+        </details>
+        `;
+
+        /* PNG */
+        if(signature==="PNG"){
+            let chunks=parsePNG(buffer);
+            let html="<details><summary>PNG Chunks</summary><table><tr><th>Tipo</th><th>Tamanho</th></tr>";
+            chunks.forEach(c=>{
+                html+=`<tr><td>${c.type}</td><td>${c.length}</td></tr>`;
+            });
+            html+="</table></details>";
+            container.innerHTML+=html;
+        }
+
+        /* PDF */
+        if(signature==="PDF"){
+            let info=parsePDF(buffer);
+            let html="<details><summary>PDF Metadata</summary>";
+            if(info.version) html+=`Versão: ${info.version}<br>`;
+            ["Title","Author","Creator","Producer","CreationDate","ModDate"].forEach(k=>{
+                if(info[k]) html+=`${k}: ${info[k]}<br>`;
+            });
+            if(info.js) html+=`<span class="warning">JavaScript embutido detectado</span><br>`;
+            if(info.embedded) html+=`<span class="warning">Arquivos embutidos detectados</span><br>`;
+            if(info.xmp) html+=`<details><summary>XMP</summary><pre>${info.xmp}</pre></details>`;
+            html+="</details>";
+            container.innerHTML+=html;
+        }
+
+    }
+}
+</script>
+</body>
+</html>
