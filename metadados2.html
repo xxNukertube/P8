@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Forensic Tactical Suite - Offline Edition</title>
+<style>
+body{margin:0;background:#0b0f14;color:#e6e6e6;font-family:Consolas,monospace}
+header{background:#141a22;padding:15px;border-bottom:1px solid #2c3542}
+h1{margin:0;font-size:18px}
+.notice{color:#8bc34a;font-size:12px}
+#drop{margin:20px;padding:40px;border:2px dashed #2c3542;text-align:center;cursor:pointer}
+#drop.hover{border-color:#00ffc8}
+.file{margin:20px;padding:15px;background:#141a22;border:1px solid #2c3542}
+button{background:#1f2933;border:1px solid #334155;color:#fff;padding:4px 8px;cursor:pointer}
+button:hover{background:#334155}
+details{margin-top:10px;border-top:1px solid #2c3542;padding-top:6px}
+.warning{color:#ff4d4d;font-weight:bold}
+.high{color:#ff0000;font-weight:bold}
+.medium{color:#ffcc00;font-weight:bold}
+.low{color:#00ff99;font-weight:bold}
+.hex{font-size:12px;background:#070a0f;padding:10px;overflow:auto;max-height:250px}
+table{border-collapse:collapse;font-size:13px}
+td,th{border:1px solid #2c3542;padding:4px 6px}
+.timeline{background:#0e141b;padding:8px}
+</style>
+</head>
+<body>
+<header>
+<h1>Forensic Tactical Suite — Advanced Offline Analyzer</h1>
+<div class="notice">Arquivos nunca deixam seu navegador. Nenhuma persistência é realizada.</div>
+</header>
+
+<div id="drop">Arraste arquivos aqui ou clique<input type="file" id="input" multiple hidden></div>
+<div id="output"></div>
+
+<script>
+
+/* =========================
+   UTIL
+========================= */
+
+function readFile(file){
+ return new Promise((res,rej)=>{
+   const r=new FileReader();
+   r.onload=()=>res(r.result);
+   r.onerror=rej;
+   r.readAsArrayBuffer(file);
+ });
+}
+
+function formatBytes(b){
+ if(b===0) return "0 B";
+ const s=["B","KB","MB","GB"];
+ let i=Math.floor(Math.log(b)/Math.log(1024));
+ return (b/Math.pow(1024,i)).toFixed(2)+" "+s[i];
+}
+
+function hex(buf,len){
+ return [...new Uint8Array(buf.slice(0,len))]
+ .map(b=>b.toString(16).padStart(2,'0')).join(' ');
+}
+
+/* =========================
+   ENTROPIA GLOBAL
+========================= */
+
+function calculateEntropy(buffer){
+ const bytes=new Uint8Array(buffer);
+ const freq=new Array(256).fill(0);
+ bytes.forEach(b=>freq[b]++);
+ let e=0;
+ freq.forEach(f=>{
+  if(f){
+   let p=f/bytes.length;
+   e-=p*Math.log2(p);
+  }
+ });
+ return e;
+}
+
+/* =========================
+   ENTROPIA POR BLOCO
+========================= */
+
+function blockEntropy(buffer,size=4096){
+ let blocks=[];
+ for(let i=0;i<buffer.byteLength;i+=size){
+   blocks.push(calculateEntropy(buffer.slice(i,i+size)));
+ }
+ return blocks;
+}
+
+/* =========================
+   HASH
+========================= */
+
+function buf2hex(b){return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
+
+async function computeHash(buffer,algo){
+ let start=performance.now();
+ let digest=await crypto.subtle.digest(algo,buffer);
+ let end=performance.now();
+ return {hash:buf2hex(digest),time:(end-start).toFixed(2)};
+}
+
+/* =========================
+   EXIF PARSER AVANÇADO
+========================= */
+
+function parseEXIF(buffer){
+ const view=new DataView(buffer);
+ if(view.getUint16(0)!==0xFFD8) return null;
+ let offset=2;
+
+ while(offset<buffer.byteLength){
+  if(view.getUint16(offset)===0xFFE1){
+   let len=view.getUint16(offset+2);
+   let header=new TextDecoder().decode(new Uint8Array(buffer.slice(offset+4,offset+10)));
+   if(header==="Exif\0\0"){
+    let tiff=offset+10;
+    let little=view.getUint16(tiff)===0x4949;
+    let getShort=(o)=>view.getUint16(o,little);
+    let getLong=(o)=>view.getUint32(o,little);
+
+    let firstIFD=tiff+getLong(tiff+4);
+    let entries=getShort(firstIFD);
+    let data={};
+
+    for(let i=0;i<entries;i++){
+      let entry=firstIFD+2+i*12;
+      let tag=getShort(entry);
+      let type=getShort(entry+2);
+      let count=getLong(entry+4);
+      let valueOffset=entry+8;
+
+      function readString(offset,len){
+        return new TextDecoder().decode(buffer.slice(offset,offset+len)).replace(/\0/g,'');
+      }
+
+      if(tag===0x010F) data.Make=readString(valueOffset,count);
+      if(tag===0x0110) data.Model=readString(valueOffset,count);
+      if(tag===0x0131) data.Software=readString(valueOffset,count);
+      if(tag===0x9003) data.DateTimeOriginal=readString(valueOffset,count);
+    }
+
+    return data;
+   }
+  }
+  offset+=2;
+ }
+ return null;
+}
+
+/* =========================
+   PDF ANÁLISE AVANÇADA
+========================= */
+
+function analyzePDF(buffer){
+ const text=new TextDecoder().decode(buffer);
+ let flags=[];
+ const keywords=["/OpenAction","/AA","/JavaScript","/JS","/Launch","/EmbeddedFiles","/ObjStm"];
+ keywords.forEach(k=>{
+   if(text.includes(k)) flags.push(k);
+ });
+ let version=(/PDF-(\d\.\d)/.exec(text)||[])[1];
+ return {flags,version};
+}
+
+/* =========================
+   TIMELINE
+========================= */
+
+function buildTimeline(meta){
+ let items=[];
+ if(meta.created) items.push({event:"Created",date:meta.created});
+ if(meta.modified) items.push({event:"Modified",date:meta.modified});
+ items.sort((a,b)=>new Date(a.date)-new Date(b.date));
+ return items;
+}
+
+/* =========================
+   SCORE FORENSE
+========================= */
+
+function forensicScore(entropyValue,flags,hasGPS,mismatch){
+ let score=0;
+ if(entropyValue>7.8) score+=30;
+ if(flags && flags.length) score+=20;
+ if(hasGPS) score+=15;
+ if(mismatch) score+=15;
+ return Math.min(score,100);
+}
+
+/* =========================
+   ASSINATURA
+========================= */
+
+function detectSignature(buffer){
+ let h=buf2hex(buffer.slice(0,8)).toUpperCase();
+ if(h.startsWith("FFD8FF")) return "JPEG";
+ if(h.startsWith("89504E47")) return "PNG";
+ if(h.startsWith("25504446")) return "PDF";
+ if(h.startsWith("504B0304")) return "ZIP/DOCX";
+ return "UNKNOWN";
+}
+
+/* =========================
+   UI
+========================= */
+
+const drop=document.getElementById("drop");
+const input=document.getElementById("input");
+const out=document.getElementById("output");
+
+drop.onclick=()=>input.click();
+drop.ondragover=e=>{e.preventDefault();drop.classList.add("hover")}
+drop.ondragleave=()=>drop.classList.remove("hover")
+drop.ondrop=e=>{
+ e.preventDefault();
+ drop.classList.remove("hover");
+ handle(e.dataTransfer.files);
+}
+input.onchange=()=>handle(input.files);
+
+async function handle(files){
+ for(let file of files){
+   let buffer=await readFile(file);
+   let clone=buffer.slice(0);
+
+   let div=document.createElement("div");
+   div.className="file";
+   div.innerHTML="<b>"+file.name+"</b> <button>Remover</button>";
+   out.appendChild(div);
+
+   div.querySelector("button").onclick=()=>{
+     new Uint8Array(clone).fill(0);
+     div.remove();
+   }
+
+   let signature=detectSignature(clone);
+   let mismatch=file.type && !file.type.toUpperCase().includes(signature);
+
+   let ent=calculateEntropy(clone);
+   let blocks=blockEntropy(clone);
+
+   let pdfAnalysis=null;
+   if(signature==="PDF") pdfAnalysis=analyzePDF(clone);
+
+   let exif=null;
+   let hasGPS=false;
+   if(signature==="JPEG"){
+     exif=parseEXIF(clone);
+   }
+
+   let score=forensicScore(ent,pdfAnalysis?.flags,hasGPS,mismatch);
+
+   let riskClass=score>70?"high":score>40?"medium":"low";
+
+   div.innerHTML+=`
+   <details open><summary>Informações Básicas</summary>
+   Tamanho: ${formatBytes(file.size)}<br>
+   MIME: ${file.type||"Indefinido"}<br>
+   Assinatura: ${signature}<br>
+   ${mismatch?'<div class="warning">Mismatch MIME/Assinatura</div>':''}
+   </details>
+
+   <details><summary>Hashes</summary>
+   SHA-256: ${(await computeHash(clone,"SHA-256")).hash}
+   </details>
+
+   <details><summary>Entropia</summary>
+   Global: ${ent.toFixed(4)}<br>
+   Blocos: ${blocks.map(v=>v.toFixed(2)).slice(0,10).join(" | ")}
+   </details>
+
+   <details><summary>Hex (256 bytes)</summary>
+   <div class="hex">${hex(clone,256)}</div>
+   </details>
+   `;
+
+   if(exif){
+     let ex="";
+     for(let k in exif) ex+=k+": "+exif[k]+"<br>";
+     div.innerHTML+=`<details open><summary>EXIF</summary>${ex}</details>`;
+   }
+
+   if(pdfAnalysis){
+     let flags=pdfAnalysis.flags.length?
+       '<div class="warning">Flags: '+pdfAnalysis.flags.join(", ")+'</div>'
+       :"Nenhum indicador malicioso detectado";
+     div.innerHTML+=`
+     <details open><summary>PDF Análise</summary>
+     Versão: ${pdfAnalysis.version||"Indefinida"}<br>
+     ${flags}
+     </details>`;
+   }
+
+   div.innerHTML+=`
+   <details open><summary>Forensic Risk Score</summary>
+   Score: <span class="${riskClass}">${score}/100</span>
+   </details>
+   `;
+ }
+}
+
+</script>
+</body>
+</html>
