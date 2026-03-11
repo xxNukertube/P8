@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerador de PCCR - Polícia Militar do Tocantins</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Estilos personalizados para barra de rolagem e impressão */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+
+        @media print {
+            body { background: white; margin: 0; padding: 0; }
+            .no-print { display: none !important; }
+            #print-area { width: 100%; }
+            table { width: 100%; border-collapse: collapse; font-size: 10pt; }
+            th, td { border: 1px solid #000; padding: 4px; text-align: center; }
+            .print-teto-warning { color: red !important; font-weight: bold; }
+        }
+        
+        .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(2px);
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans h-screen flex flex-col overflow-hidden">
+
+    <!-- Navbar -->
+    <header class="bg-blue-900 text-white p-4 shadow-md flex justify-between items-center no-print shrink-0">
+        <div class="flex items-center gap-3">
+            <svg class="w-8 h-8 text-yellow-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5zm0 18c-3.75-1-6.9-4.88-7.89-8.91L12 12V4.14l7 3.89V12l-7.89-.91c.99 4.03 4.14 7.91 7.89 8.91z"/></svg>
+            <h1 class="text-xl font-bold uppercase tracking-wide">Gerador de PCCR <span class="text-blue-300 font-normal text-sm block md:inline md:ml-2">Polícia Militar do Tocantins</span></h1>
+        </div>
+        <div class="flex gap-2">
+            <button onclick="window.print()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-md text-sm font-semibold transition flex items-center gap-2">
+                🖨️ Imprimir / PDF
+            </button>
+            <button onclick="exportarWord()" class="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-md text-sm font-semibold transition flex items-center gap-2">
+                📄 Exportar DOCX
+            </button>
+        </div>
+    </header>
+
+    <!-- Layout Principal -->
+    <div class="flex flex-1 overflow-hidden no-print">
+        
+        <!-- Sidebar de Configurações -->
+        <aside class="w-80 bg-white border-r border-slate-200 p-5 overflow-y-auto shrink-0 shadow-inner flex flex-col gap-6">
+            
+            <!-- Teto Constitucional -->
+            <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                <h3 class="font-bold text-slate-700 mb-3 flex items-center gap-2">⚖️ Teto Constitucional</h3>
+                <label class="block text-xs font-semibold text-slate-500 mb-1">Nome da Referência</label>
+                <input type="text" id="tetoNome" class="w-full border p-2 rounded mb-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none" onchange="atualizarConfig()">
+                
+                <label class="block text-xs font-semibold text-slate-500 mb-1">Valor (R$)</label>
+                <input type="number" id="tetoValor" step="0.01" class="w-full border p-2 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" onchange="atualizarConfig()">
+            </div>
+
+            <!-- Regras Gerais -->
+            <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                <h3 class="font-bold text-slate-700 mb-3 flex items-center gap-2">⚙️ Regras Gerais</h3>
+                <label class="block text-xs font-semibold text-slate-500 mb-1">Anos para Progressão (Letra)</label>
+                <input type="number" id="anosProgressao" class="w-full border p-2 rounded mb-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none" onchange="atualizarConfig()">
+
+                <label class="block text-xs font-semibold text-slate-500 mb-1">Taxa Padrão entre Letras (%)</label>
+                <input type="number" id="taxaProgressao" step="0.1" class="w-full border p-2 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" onchange="atualizarConfig()">
+            </div>
+
+            <!-- Referência Relativa (%) -->
+            <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                <h3 class="font-bold text-slate-700 mb-3 flex items-center gap-2">📊 Base de Paridade (%)</h3>
+                <label class="block text-xs font-semibold text-slate-500 mb-1">Posto de Referência</label>
+                <select id="refPosto" class="w-full border p-2 rounded mb-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none" onchange="atualizarConfig()"></select>
+                
+                <label class="block text-xs font-semibold text-slate-500 mb-1">Letra de Referência</label>
+                <select id="refLetra" class="w-full border p-2 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" onchange="atualizarConfig()"></select>
+            </div>
+
+            <!-- Ações em Lote -->
+            <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                <h3 class="font-bold text-slate-700 mb-3 flex items-center gap-2">🪄 Reajuste em Lote</h3>
+                <button onclick="abrirModalReajuste()" class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-md text-sm font-semibold transition">
+                    Aplicar Reajuste (+% ou +R$)
+                </button>
+            </div>
+
+        </aside>
+
+        <!-- Área da Tabela -->
+        <main class="flex-1 bg-slate-100 p-6 overflow-hidden flex flex-col">
+            <div class="flex justify-between items-end mb-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800">Tabela de Subsídios</h2>
+                    <p class="text-sm text-slate-500 mt-1" id="info-teto">Os valores que ultrapassam o teto estarão destacados em vermelho.</p>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="adicionarPosto()" class="bg-blue-100 text-blue-700 hover:bg-blue-200 px-3 py-1.5 rounded text-sm font-semibold transition">
+                        + Novo Posto
+                    </button>
+                    <button onclick="adicionarLetraGlobal()" class="bg-blue-100 text-blue-700 hover:bg-blue-200 px-3 py-1.5 rounded text-sm font-semibold transition">
+                        + Nova Letra
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tabela Wrapper -->
+            <div class="bg-white border border-slate-200 rounded-lg shadow-sm flex-1 overflow-auto relative" id="print-area">
+                <table class="w-full text-left whitespace-nowrap min-w-max">
+                    <thead class="bg-slate-50 sticky top-0 z-10 shadow-sm" id="tabela-head">
+                        <!-- Gerado via JS -->
+                    </thead>
+                    <tbody class="divide-y divide-slate-100" id="tabela-body">
+                        <!-- Gerado via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modais -->
+
+    <!-- Modal Reajuste -->
+    <div id="modal-reajuste" class="fixed inset-0 modal-overlay hidden z-50 flex items-center justify-center">
+        <div class="bg-white p-6 rounded-lg shadow-xl w-96">
+            <h2 class="text-xl font-bold mb-4">Aplicar Reajuste</h2>
+            
+            <div class="mb-3">
+                <label class="block text-sm font-semibold mb-1">Tipo de Reajuste</label>
+                <select id="reajuste-tipo" class="w-full border p-2 rounded">
+                    <option value="percent">Percentual (%)</option>
+                    <option value="fixed">Valor Fixo (+ R$)</option>
+                </select>
+            </div>
+            
+            <div class="mb-3">
+                <label class="block text-sm font-semibold mb-1">Valor</label>
+                <input type="number" id="reajuste-valor" step="0.01" class="w-full border p-2 rounded" placeholder="Ex: 5 ou 300">
+            </div>
+
+            <div class="mb-3">
+                <label class="block text-sm font-semibold mb-1">Aplicar ao Posto</label>
+                <select id="reajuste-posto" class="w-full border p-2 rounded">
+                    <option value="ALL">Todos os Postos</option>
+                    <!-- Preenchido via JS -->
+                </select>
+            </div>
+
+            <div class="mb-5">
+                <label class="block text-sm font-semibold mb-1">Aplicar à Letra</label>
+                <select id="reajuste-letra" class="w-full border p-2 rounded">
+                    <option value="ALL">Todas as Letras</option>
+                    <!-- Preenchido via JS -->
+                </select>
+            </div>
+
+            <div class="flex justify-end gap-2">
+                <button onclick="fecharModais()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded text-slate-700 font-semibold">Cancelar</button>
+                <button onclick="aplicarReajusteLote()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-white font-semibold">Aplicar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Editar Valor Específico -->
+    <div id="modal-editar-valor" class="fixed inset-0 modal-overlay hidden z-50 flex items-center justify-center">
+        <div class="bg-white p-6 rounded-lg shadow-xl w-80">
+            <h2 class="text-lg font-bold mb-2" id="editar-titulo">Editar Subsídio</h2>
+            <p class="text-sm text-slate-500 mb-4" id="editar-subtitulo"></p>
+            
+            <label class="block text-sm font-semibold mb-1">Novo Valor (R$)</label>
+            <input type="number" id="editar-input-valor" step="0.01" class="w-full border p-2 rounded mb-5 text-lg font-bold text-green-700 outline-none focus:ring-2 focus:ring-green-500">
+            
+            <div class="flex justify-end gap-2">
+                <button onclick="fecharModais()" class="px-4 py-2 bg-slate-200 rounded font-semibold text-slate-700 hover:bg-slate-300">Cancelar</button>
+                <button onclick="salvarEdicaoValor()" class="px-4 py-2 bg-green-600 rounded font-semibold text-white hover:bg-green-700">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ESTADO INICIAL DA APLICAÇÃO (Baseado no PDF)
+        const estadoInicial = {
+            config: {
+                tetoNome: "Subsídio do Governador",
+                tetoValor: 32518.44,
+                anosProgressao: 3,
+                taxaProgressao: 5.0,
+                refPostoId: "p1", // Coronel
+                refLetra: "A"
+            },
+            letras: ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"],
+            postos: [
+                { id: "p1", nome: "CORONEL", values: {"A":25277.50, "B":26541.38, "C":27868.45, "D":29261.87, "E":30724.97, "F":32261.22, "G":33874.27, "H":35567.99, "I":37346.39, "J":39213.71} },
+                { id: "p2", nome: "TENENTE-CORONEL", values: {"A":22749.76, "B":23887.25, "C":25081.59, "D":26335.69, "E":27652.47, "F":29035.10, "G":30486.84, "H":32011.19, "I":33611.74, "J":35292.34} },
+                { id: "p3", nome: "MAJOR", values: {"A":20474.78, "B":21498.53, "C":22573.46, "D":23702.12, "E":24887.23, "F":26131.60, "G":27438.17, "H":28810.08, "I":30250.57, "J":31763.12} },
+                { id: "p4", nome: "CAPITÃO", values: {"A":18427.30, "B":19348.66, "C":20316.09, "D":21331.91, "E":22398.49, "F":23518.42, "G":24694.34, "H":25929.07, "I":27225.51, "J":28586.78} },
+                { id: "p5", nome: "PRIMEIRO TENENTE", values: {"A":14731.25, "B":15467.82, "C":16241.22, "D":17053.26, "E":17905.93, "F":18801.23, "G":19741.28, "H":20728.36, "I":21764.78, "J":22853.00} },
+                { id: "p6", nome: "SEGUNDO TENENTE", values: {"A":13696.64, "B":14381.46, "C":15100.56, "D":15855.57, "E":16648.36, "F":17480.77, "G":18354.82, "H":19272.56, "I":20236.18, "J":21247.99} },
+                { id: "p7", nome: "SUBTENENTE", values: {"A":11294.25, "B":11858.97, "C":12451.91, "D":13074.51, "E":13728.24, "F":14414.64, "G":15135.38, "H":15892.14, "I":16686.76, "J":17521.09} },
+                { id: "p8", nome: "PRIMEIRO SARGENTO", values: {"A":9631.61, "B":10113.20, "C":10618.85, "D":11149.78, "E":11707.28, "F":12292.64, "G":12907.28, "H":13552.64, "I":14230.27, "J":14941.78} },
+                { id: "p9", nome: "SEGUNDO SARGENTO", values: {"A":8664.94, "B":9098.20, "C":9553.10, "D":10030.75, "E":10532.30, "F":11058.90, "G":11611.84, "H":12192.45, "I":12802.06, "J":13442.16} },
+                { id: "p10", nome: "TERCEIRO SARGENTO", values: {"A":7674.38, "B":8058.11, "C":8461.03, "D":8884.09, "E":9328.28, "F":9794.70, "G":10284.43, "H":10798.64, "I":11338.58, "J":11905.51} },
+                { id: "p11", nome: "CABO", values: {"A":7418.84, "B":7789.79, "C":8179.28, "D":8588.24, "E":9017.65, "F":9468.53, "G":9941.95, "H":10439.07, "I":10961.02, "J":11509.08} },
+                { id: "p12", nome: "SOLDADO", values: {"A":6003.39, "B":6303.57, "C":6618.73, "D":6949.68, "E":7297.17, "F":7662.02, "G":8045.12, "H":8447.38, "I":8869.74, "J":9313.23} },
+                { id: "p13", nome: "ASPIRANTE A OFICIAL", values: {"A":11294.25} },
+                { id: "p14", nome: "CADETE III", values: {"A":7583.24} },
+                { id: "p15", nome: "CADETE II", values: {"A":6845.30} },
+                { id: "p16", nome: "CADETE I", values: {"A":6062.76} },
+                { id: "p17", nome: "ALUNO PRAÇA", values: {"A":3001.69} }
+            ]
+        };
+
+        // Usa LocalStorage para persistência (cópia profunda para evitar referências)
+        let state = JSON.parse(JSON.stringify(estadoInicial));
+
+        // Formatador Monetário
+        const formatBRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+
+        // Variáveis de controle de edição
+        let edicaoAtual = { postoId: null, letra: null };
+
+        // INICIALIZAÇÃO
+        window.onload = () => {
+            sincronizarInputsSidebar();
+            renderTable();
+        };
+
+        function sincronizarInputsSidebar() {
+            document.getElementById('tetoNome').value = state.config.tetoNome;
+            document.getElementById('tetoValor').value = state.config.tetoValor;
+            document.getElementById('anosProgressao').value = state.config.anosProgressao;
+            document.getElementById('taxaProgressao').value = state.config.taxaProgressao;
+            
+            atualizarSelectsReferencia();
+        }
+
+        function atualizarSelectsReferencia() {
+            const selPosto = document.getElementById('refPosto');
+            const selLetra = document.getElementById('refLetra');
+            const selReajustePosto = document.getElementById('reajuste-posto');
+            const selReajusteLetra = document.getElementById('reajuste-letra');
+
+            selPosto.innerHTML = '';
+            selReajustePosto.innerHTML = '<option value="ALL">Todos os Postos</option>';
+            state.postos.forEach(p => {
+                selPosto.innerHTML += `<option value="${p.id}" ${p.id === state.config.refPostoId ? 'selected' : ''}>${p.nome}</option>`;
+                selReajustePosto.innerHTML += `<option value="${p.id}">${p.nome}</option>`;
+            });
+
+            selLetra.innerHTML = '';
+            selReajusteLetra.innerHTML = '<option value="ALL">Todas as Letras</option>';
+            state.letras.forEach(l => {
+                selLetra.innerHTML += `<option value="${l}" ${l === state.config.refLetra ? 'selected' : ''}>${l}</option>`;
+                selReajusteLetra.innerHTML += `<option value="${l}">${l}</option>`;
+            });
+        }
+
+        function atualizarConfig() {
+            state.config.tetoNome = document.getElementById('tetoNome').value;
+            state.config.tetoValor = parseFloat(document.getElementById('tetoValor').value) || 0;
+            state.config.anosProgressao = parseInt(document.getElementById('anosProgressao').value) || 1;
+            state.config.taxaProgressao = parseFloat(document.getElementById('taxaProgressao').value) || 0;
+            state.config.refPostoId = document.getElementById('refPosto').value;
+            state.config.refLetra = document.getElementById('refLetra').value;
+            
+            document.getElementById('info-teto').innerText = `Os valores que ultrapassam o ${state.config.tetoNome} (R$ ${state.config.tetoValor.toFixed(2)}) estarão destacados em vermelho.`;
+            renderTable();
+        }
+
+        // RENDERIZAÇÃO DA TABELA PRINCIPAL
+        function renderTable() {
+            const thead = document.getElementById('tabela-head');
+            const tbody = document.getElementById('tabela-body');
+            
+            // Calculo da Referência Base
+            const postoRef = state.postos.find(p => p.id === state.config.refPostoId);
+            const valorRef = (postoRef && postoRef.values[state.config.refLetra]) ? postoRef.values[state.config.refLetra] : 1;
+
+            // Header
+            let thHtml = `<tr>
+                <th class="p-3 border-b-2 border-slate-200 font-bold text-slate-700 w-64 bg-slate-100 z-20 sticky left-0 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">POSTO / GRADUAÇÃO</th>`;
+            
+            state.letras.forEach((letra, index) => {
+                thHtml += `
+                <th class="p-3 border-b-2 border-slate-200 text-center min-w-[140px] group relative">
+                    <span class="font-bold text-slate-800 text-lg">${letra}</span>
+                    <button onclick="removerLetraGlobal('${letra}')" class="no-print hidden group-hover:inline-block absolute top-2 right-2 text-red-500 hover:bg-red-100 rounded p-1 text-xs" title="Excluir Letra">❌</button>
+                    <button onclick="editarNomeLetra('${letra}', ${index})" class="no-print hidden group-hover:inline-block absolute top-2 left-2 text-blue-500 hover:bg-blue-100 rounded p-1 text-xs" title="Renomear Letra">✏️</button>
+                </th>`;
+            });
+            thHtml += `<th class="p-3 border-b-2 border-slate-200 text-center no-print w-32">AÇÕES</th></tr>`;
+            thead.innerHTML = thHtml;
+
+            // Body
+            let tbHtml = '';
+            state.postos.forEach((posto, index) => {
+                tbHtml += `<tr class="hover:bg-blue-50/50 transition duration-150">`;
+                
+                // Coluna Nome do Posto
+                tbHtml += `
+                <td class="p-3 border-b border-slate-100 font-semibold text-slate-700 bg-white z-10 sticky left-0 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] group">
+                    <div class="flex items-center justify-between">
+                        <span class="cursor-pointer hover:text-blue-600" onclick="editarNomePosto('${posto.id}')">${posto.nome}</span>
+                        <div class="no-print hidden group-hover:flex gap-1">
+                            ${index > 0 ? `<button onclick="moverPosto(${index}, -1)" class="text-slate-400 hover:text-blue-600">⬆️</button>` : ''}
+                            ${index < state.postos.length - 1 ? `<button onclick="moverPosto(${index}, 1)" class="text-slate-400 hover:text-blue-600">⬇️</button>` : ''}
+                        </div>
+                    </div>
+                </td>`;
+
+                // Colunas das Letras
+                state.letras.forEach(letra => {
+                    const hasValor = posto.values[letra] !== undefined;
+                    const valor = hasValor ? posto.values[letra] : null;
+                    
+                    if (hasValor) {
+                        const percent = ((valor / valorRef) * 100).toFixed(2);
+                        const ultrapassaTeto = valor > state.config.tetoValor;
+                        const classTeto = ultrapassaTeto ? 'text-red-600 font-bold print-teto-warning' : 'text-slate-800';
+                        
+                        tbHtml += `
+                        <td class="p-2 border-b border-slate-100 text-center relative group">
+                            <div class="border border-transparent group-hover:border-blue-200 p-2 rounded cursor-pointer transition bg-white shadow-sm" onclick="abrirEdicaoValor('${posto.id}', '${letra}', ${valor})">
+                                <div class="${classTeto} text-sm">${formatBRL.format(valor)}</div>
+                                <div class="text-[10px] text-slate-500 mt-1" title="Percentual em relação ao ${postoRef?.nome || ''} ${state.config.refLetra}">${percent}%</div>
+                            </div>
+                            <button onclick="removerLetraDoPosto(event, '${posto.id}', '${letra}')" class="no-print absolute -top-1 -right-1 hidden group-hover:block bg-red-100 text-red-600 rounded-full w-5 h-5 text-[10px] font-bold border border-white shadow">X</button>
+                        </td>`;
+                    } else {
+                        tbHtml += `
+                        <td class="p-2 border-b border-slate-100 text-center no-print">
+                            <button onclick="adicionarLetraNoPosto('${posto.id}', '${letra}')" class="w-full h-full min-h-[50px] border-2 border-dashed border-slate-200 rounded text-slate-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition text-xs flex items-center justify-center">
+                                + Add
+                            </button>
+                        </td>`;
+                    }
+                });
+
+                // Coluna de Ações
+                tbHtml += `
+                <td class="p-3 border-b border-slate-100 text-center no-print space-x-2">
+                    <button onclick="propagarProgressoPosto('${posto.id}')" class="text-blue-600 hover:bg-blue-100 px-2 py-1 rounded text-xs border border-blue-200" title="Preencher as próximas letras automaticamente com +${state.config.taxaProgressao}%">🪄 Propagar</button>
+                    <button onclick="removerPosto('${posto.id}')" class="text-red-600 hover:bg-red-100 px-2 py-1 rounded text-xs border border-red-200" title="Excluir Posto">🗑️</button>
+                </td>`;
+                
+                tbHtml += `</tr>`;
+            });
+            
+            tbody.innerHTML = tbHtml;
+        }
+
+        // --- FUNÇÕES DE EDIÇÃO E MODAIS ---
+
+        function abrirModalReajuste() {
+            document.getElementById('modal-reajuste').classList.remove('hidden');
+        }
+
+        function fecharModais() {
+            document.getElementById('modal-reajuste').classList.add('hidden');
+            document.getElementById('modal-editar-valor').classList.add('hidden');
+        }
+
+        function abrirEdicaoValor(postoId, letra, valorAtual) {
+            edicaoAtual = { postoId, letra };
+            const posto = state.postos.find(p => p.id === postoId);
+            
+            document.getElementById('editar-titulo').innerText = `${posto.nome} - Letra ${letra}`;
+            document.getElementById('editar-subtitulo').innerText = `Altere o valor do subsídio para esta combinação.`;
+            document.getElementById('editar-input-valor').value = valorAtual;
+            
+            document.getElementById('modal-editar-valor').classList.remove('hidden');
+            setTimeout(() => document.getElementById('editar-input-valor').focus(), 100);
+        }
+
+        function salvarEdicaoValor() {
+            const novoValor = parseFloat(document.getElementById('editar-input-valor').value);
+            if (!isNaN(novoValor) && novoValor >= 0) {
+                const posto = state.postos.find(p => p.id === edicaoAtual.postoId);
+                if (posto) {
+                    posto.values[edicaoAtual.letra] = novoValor;
+                    fecharModais();
+                    renderTable();
+                }
+            } else {
+                alert("Insira um valor numérico válido.");
+            }
+        }
+
+        // --- FUNCIONALIDADES CORE ---
+
+        function aplicarReajusteLote() {
+            const tipo = document.getElementById('reajuste-tipo').value;
+            const valor = parseFloat(document.getElementById('reajuste-valor').value);
+            const alvoPosto = document.getElementById('reajuste-posto').value;
+            const alvoLetra = document.getElementById('reajuste-letra').value;
+
+            if (isNaN(valor)) {
+                alert("Por favor, informe um valor válido para o reajuste.");
+                return;
+            }
+
+            state.postos.forEach(posto => {
+                if (alvoPosto === "ALL" || posto.id === alvoPosto) {
+                    state.letras.forEach(letra => {
+                        if (posto.values[letra] !== undefined) {
+                            if (alvoLetra === "ALL" || letra === alvoLetra) {
+                                let atual = posto.values[letra];
+                                if (tipo === "percent") {
+                                    posto.values[letra] = atual + (atual * (valor / 100));
+                                } else {
+                                    posto.values[letra] = atual + valor;
+                                }
+                            }
+                        }
+                    });
+                }
+            });
+
+            fecharModais();
+            renderTable();
+        }
+
+        function propagarProgressoPosto(postoId) {
+            const posto = state.postos.find(p => p.id === postoId);
+            if (!posto) return;
+
+            const confirmacao = confirm(`Deseja preencher automaticamente as letras seguintes deste posto aplicando um reajuste de ${state.config.taxaProgressao}% sobre a letra anterior? As letras vazias serão criadas.`);
+            if(!confirmacao) return;
+
+            const taxa = 1 + (state.config.taxaProgressao / 100);
+            
+            // Encontra a primeira letra preenchida para usar de base
+            let valorBase = null;
+            let startIdx = -1;
+
+            for (let i = 0; i < state.letras.length; i++) {
+                const l = state.letras[i];
+                if (posto.values[l] !== undefined) {
+                    valorBase = posto.values[l];
+                    startIdx = i;
+                    break;
+                }
+            }
+
+            if (valorBase === null) {
+                alert("Não há nenhuma letra preenchida para usar como base.");
+                return;
+            }
+
+            for (let i = startIdx + 1; i < state.letras.length; i++) {
+                const l = state.letras[i];
+                valorBase = valorBase * taxa;
+                posto.values[l] = parseFloat(valorBase.toFixed(2));
+            }
+
+            renderTable();
+        }
+
+        // --- GERENCIAMENTO DE POSTOS ---
+        
+        function adicionarPosto() {
+            const nome = prompt("Nome do novo Posto/Graduação:");
+            if (!nome || nome.trim() === "") return;
+
+            const valorA = prompt(`Valor inicial para ${nome} na Letra A:`);
+            const val = parseFloat(valorA);
+            
+            if (isNaN(val)) {
+                alert("Operação cancelada. Valor inválido.");
+                return;
+            }
+
+            const novoId = "p" + Date.now();
+            state.postos.push({
+                id: novoId,
+                nome: nome.toUpperCase(),
+                values: { "A": val }
+            });
+
+            atualizarSelectsReferencia();
+            renderTable();
+        }
+
+        function editarNomePosto(postoId) {
+            const posto = state.postos.find(p => p.id === postoId);
+            const novoNome = prompt("Novo nome para o posto:", posto.nome);
+            if (novoNome && novoNome.trim() !== "") {
+                posto.nome = novoNome.toUpperCase();
+                atualizarSelectsReferencia();
+                renderTable();
+            }
+        }
+
+        function removerPosto(postoId) {
+            if (confirm("Tem certeza que deseja remover este posto?")) {
+                state.postos = state.postos.filter(p => p.id !== postoId);
+                if (state.config.refPostoId === postoId) state.config.refPostoId = state.postos[0]?.id || "";
+                atualizarSelectsReferencia();
+                renderTable();
+            }
+        }
+
+        function moverPosto(index, direcao) {
+            const array = state.postos;
+            if (index + direcao < 0 || index + direcao >= array.length) return;
+            
+            // Swap
+            const temp = array[index];
+            array[index] = array[index + direcao];
+            array[index + direcao] = temp;
+            
+            renderTable();
+        }
+
+        // --- GERENCIAMENTO DE LETRAS ---
+
+        function adicionarLetraGlobal() {
+            const novaLetra = prompt("Qual o nome da nova letra? (Ex: K, L, M)");
+            if (!novaLetra || novaLetra.trim() === "") return;
+            
+            const l = novaLetra.toUpperCase().trim();
+            if (state.letras.includes(l)) {
+                alert("Essa letra já existe!");
+                return;
+            }
+
+            state.letras.push(l);
+            atualizarSelectsReferencia();
+            renderTable();
+        }
+
+        function editarNomeLetra(letraAtual, index) {
+            const novoNome = prompt("Renomear letra para:", letraAtual);
+            if (!novoNome || novoNome.trim() === "") return;
+            const l = novoNome.toUpperCase().trim();
+            
+            if (state.letras.includes(l) && l !== letraAtual) {
+                alert("Essa letra já existe.");
+                return;
+            }
+
+            // Atualiza global
+            state.letras[index] = l;
+            
+            // Atualiza nos postos
+            state.postos.forEach(p => {
+                if (p.values[letraAtual] !== undefined) {
+                    p.values[l] = p.values[letraAtual];
+                    delete p.values[letraAtual];
+                }
+            });
+
+            if (state.config.refLetra === letraAtual) state.config.refLetra = l;
+
+            atualizarSelectsReferencia();
+            renderTable();
+        }
+
+        function removerLetraGlobal(letra) {
+            if (confirm(`Tem certeza que deseja excluir a coluna da Letra ${letra} de toda a tabela?`)) {
+                state.letras = state.letras.filter(l => l !== letra);
+                state.postos.forEach(p => {
+                    delete p.values[letra];
+                });
+
+                if (state.config.refLetra === letra) state.config.refLetra = state.letras[0] || "";
+                atualizarSelectsReferencia();
+                renderTable();
+            }
+        }
+
+        function adicionarLetraNoPosto(postoId, letra) {
+            const posto = state.postos.find(p => p.id === postoId);
+            const valor = prompt(`Informe o valor para ${posto.nome} na Letra ${letra}:`);
+            const num = parseFloat(valor);
+            
+            if (!isNaN(num)) {
+                posto.values[letra] = num;
+                renderTable();
+            }
+        }
+
+        function removerLetraDoPosto(event, postoId, letra) {
+            event.stopPropagation();
+            if(confirm(`Remover Letra ${letra} apenas deste posto?`)) {
+                const posto = state.postos.find(p => p.id === postoId);
+                delete posto.values[letra];
+                renderTable();
+            }
+        }
+
+        // --- EXPORTAÇÃO DOCX (Word) ---
+        function exportarWord() {
+            // Cria um layout HTML limpo compatível com MS Word
+            const header = `
+                <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+                <head>
+                    <meta charset='utf-8'>
+                    <title>Tabela de Subsídios PCCR</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; font-size: 11pt; }
+                        h1 { text-align: center; font-size: 14pt; margin-bottom: 5px; }
+                        h3 { text-align: center; font-size: 11pt; margin-top: 0; color: #444; }
+                        table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+                        th, td { border: 1px solid #000; padding: 5px; text-align: center; vertical-align: middle; }
+                        th { background-color: #f2f2f2; font-weight: bold; }
+                        td:first-child { text-align: left; font-weight: bold; }
+                        .teto { color: red; font-weight: bold; }
+                        .small { font-size: 8pt; color: #555; }
+                    </style>
+                </head>
+                <body>
+            `;
+            const footer = "</body></html>";
+
+            const postoRef = state.postos.find(p => p.id === state.config.refPostoId);
+            const valorRef = (postoRef && postoRef.values[state.config.refLetra]) ? postoRef.values[state.config.refLetra] : 1;
+
+            let htmlContent = `
+                <h1>TABELA DE SUBSÍDIOS DOS MEMBROS DA POLÍCIA MILITAR DO TOCANTINS</h1>
+                <h3>Referência de Paridade: ${postoRef?.nome || ''} Letra ${state.config.refLetra}</h3>
+                <h3>${state.config.tetoNome}: R$ ${state.config.tetoValor.toFixed(2).replace('.', ',')} | Progressão: a cada ${state.config.anosProgressao} anos</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>POSTO / GRADUAÇÃO</th>
+            `;
+
+            state.letras.forEach(l => {
+                htmlContent += `<th>${l}</th>`;
+            });
+            htmlContent += `</tr></thead><tbody>`;
+
+            state.postos.forEach(posto => {
+                htmlContent += `<tr><td>${posto.nome}</td>`;
+                state.letras.forEach(letra => {
+                    const val = posto.values[letra];
+                    if (val !== undefined) {
+                        const pct = ((val / valorRef) * 100).toFixed(2);
+                        const isTeto = val > state.config.tetoValor;
+                        const tetoClass = isTeto ? "class='teto'" : "";
+                        const valFormatado = val.toFixed(2).replace('.', ',');
+                        htmlContent += `<td ${tetoClass}>R$ ${valFormatado}<br><span class="small">(${pct}%)</span></td>`;
+                    } else {
+                        htmlContent += `<td>-</td>`;
+                    }
+                });
+                htmlContent += `</tr>`;
+            });
+
+            htmlContent += `</tbody></table>`;
+            const sourceHTML = header + htmlContent + footer;
+
+            // Criar e baixar arquivo
+            const blob = new Blob(['\ufeff', sourceHTML], { type: 'application/msword' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'Tabela_Subsidios_PMTO.doc';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
+    </script>
+</body>
+</html>
